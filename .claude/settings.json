@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 explore.py)",
+      "Bash(python3 eval/bench.py:*)",
+      "Bash(python3 search/index.py:*)",
+      "Bash(python3 -c:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Read(./**)",
+      "Edit(./search/**)",
+      "Edit(./eval/**)",
+      "Edit(./AGENTS.md)"
+    ],
+    "deny": [
+      "Read(~/Library/Messages/**)",
+      "Bash(sqlite3 ~/Library/Messages/**)",
+      "Write(~/msgsearch/**)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -c \"import ast,sys,glob; [ast.parse(open(f).read(),f) for f in glob.glob('**/*.py',recursive=True) if '.venv' not in f]\" || true"
+          }
+        ]
+      }
+    ]
+  }
+}
