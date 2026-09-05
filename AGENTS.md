@@ -1,64 +1,47 @@
 # query_messages
 
-Semantic search over ~271k personal iMessages (2018-08 → 2026-09). The goal is
-recall by *meaning*, not keyword — macOS Messages search only does exact matching,
-so "that password someone sent me" is unfindable today.
+Semantic search over ~260k personal iMessages (2018-08 → 2026-09), by meaning
+rather than keyword.
 
-This file is the single source of truth for all coding agents. `CLAUDE.md` imports
-it; do not duplicate rules across the two.
+Source of truth for all coding agents; `CLAUDE.md` symlinks here.
 
-## Hard constraints
+## Rules
 
-- **Never** read or write `~/Library/Messages`. All work goes against the read-only
-  copy at `~/msgsearch/chat.db`, opened as `file:...?mode=ro`.
-- ~86% of `message` rows have `text IS NULL`; the real content is in the
-  `attributedBody` typedstream blob. Always go through
-  `attributed_body.message_text(text, blob)` — never read `message.text` directly.
-- `message.date` is Apple-epoch (2001-01-01). Rows are *mixed*: pre-10.13 rows are
-  seconds, later ones nanoseconds. Use `explore.apple_ts()`; never assume one scale.
-- Message content is private. Do not print message bodies to stdout in committed
-  scripts, do not send them to any network service, and do not paste them into
-  commits, PRs, or issues. Eval fixtures use redacted excerpts only.
+Kept deliberately short. A rule earns a line here only if breaking it fails
+*silently* or *irreversibly* — anything that fails loudly teaches itself, and
+anything already enforced in code or `settings.json` is not repeated here.
+
+- **Never** touch `~/Library/Messages`. Work against `~/msgsearch/chat.db`,
+  opened `file:...?mode=ro`. (Irreversible.)
+- Message content is private: no bodies printed to stdout in committed scripts,
+  none sent over the network, none in commits or eval fixtures. (Irreversible.)
+- `message.date` is Apple-epoch and **mixes scales** — pre-10.13 rows are
+  seconds, later ones nanoseconds. Use `explore.apple_ts()`. (Silent: the wrong
+  scale yields plausible, wrong dates.)
+- ~86% of rows have `text IS NULL` with content in the `attributedBody`
+  typedstream blob. Go through `attributed_body.message_text(text, blob)`.
+  (Silent: reading `message.text` looks fine and loses most of the corpus.)
 
 ## Commands
 
 ```
-python3 explore.py                  # structural recon, no bodies printed
-python3 eval/bench.py               # THE verification loop — run before every commit
-python3 eval/bench.py --baseline    # compare against the naive LIKE retriever
+python3 search/index.py             # rebuild index.sqlite (~3s)
+python3 eval/bench.py --against baseline
+python3 eval/label.py "a query"     # add a labeled gold query
+python3 explore.py                  # structural recon
 ```
 
-## The verification loop (most important rule)
+## The verification loop
 
-Every retrieval change must be justified by `eval/bench.py`. A change that does not
-move precision@10 / MRR / recall@50 on `eval/gold.jsonl` is not an improvement — it
-is an unverified guess. Do not report a retrieval change as done without pasting the
-before/after metrics table.
+A retrieval change is justified by `eval/bench.py` or it is a guess. Report the
+before/after table; don't claim an improvement without it.
 
-If you cannot measure it, add a gold query to `eval/gold.jsonl` first, then change
-the code.
-
-## Architecture
-
-See `ARCHITECTURE.md`. Short version: SQLite is the whole system — FTS5 for lexical,
-sqlite-vec for dense, fused with RRF (k=60), then a local cross-encoder rerank.
-Local-first: no message text leaves the machine, ever.
-
-## Conventions
-
-- Python 3.14, stdlib-first. Add a dependency only when it earns its place; record
-  why in `ARCHITECTURE.md`.
-- Every module opens with a docstring saying what it does and any non-obvious
-  Apple/SQLite quirk it works around (see `attributed_body.py` for the bar).
-- Prefer plain functions over classes until state actually accumulates.
-- Comment the *why* (the Apple quirk, the ranking tradeoff), never the *what*.
+Architecture: `ARCHITECTURE.md`.
 
 ## Learned corrections
 
-Append a line here every time an agent gets something wrong. This file is the
-compounding asset of the project — mistakes get written down, not re-explained.
+Append here **only** when an agent actually gets something wrong in practice.
+Nothing speculative. If a rule can instead be enforced in code, a hook, or
+`settings.json`, do that and leave this file alone.
 
-- Do not use `datetime.utcfromtimestamp` (deprecated in 3.12+); use
-  timezone-aware `datetime(..., tzinfo=timezone.utc)` as `explore.py` does.
-- Tapbacks/reactions (`associated_message_type != 0`) are not messages; exclude
-  them from the index or they flood results with "Liked "…"".
+_(empty — nothing has gone wrong yet)_
