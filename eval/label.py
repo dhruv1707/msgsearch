@@ -26,6 +26,16 @@ INDEX = os.environ.get("MSGSEARCH_INDEX", os.path.join(ROOT, "index.sqlite"))
 
 RETRIEVERS = ["search.lexical"]  # add dense/hybrid here as they land
 
+# qmd's taxonomy, adapted to messages. Purely for grouping -- it does not change
+# search behaviour, it tells you *which kind* of query a retriever fails on.
+TYPES = {
+    "1": ("exact", "you remember the actual words (a name, number, phrase)"),
+    "2": ("semantic", "you remember the meaning, not the words"),
+    "3": ("topical", "a broad subject; many messages are valid answers"),
+    "4": ("cross-domain", "the answer uses different vocabulary than the query"),
+    "5": ("alias", "a person or thing referred to by another name/nickname"),
+}
+
 
 def pool(query, per_retriever=15):
     import importlib
@@ -94,13 +104,21 @@ def main():
     picks = input("> ").split()
     relevant = [ids[int(p) - 1] for p in picks if p.isdigit() and 1 <= int(p) <= len(ids)]
 
-    case = {"id": gid, "query": query, "relevant": relevant}
+    print("\nWhat kind of query is this?")
+    for key, (name, desc) in TYPES.items():
+        print(f"  {key}. {name:<13} {desc}")
+    choice = input("> [2] ").strip() or "2"
+    qtype = TYPES.get(choice, ("semantic", ""))[0]
+    if choice not in TYPES and choice in {n for n, _ in TYPES.values()}:
+        qtype = choice  # allow typing the name directly
+
+    case = {"id": gid, "query": query, "type": qtype, "relevant": relevant}
     gold = [c for c in gold if c["id"] != gid] + [case]
     gold.sort(key=lambda c: (len(c["id"]), c["id"]))
     with open(GOLD, "w") as f:
         for c in gold:
             f.write(json.dumps(c) + "\n")
-    print(f"\nsaved {gid}: {len(relevant)} relevant -> eval/gold.jsonl")
+    print(f"\nsaved {gid} [{qtype}]: {len(relevant)} relevant -> eval/gold.jsonl")
 
 
 if __name__ == "__main__":

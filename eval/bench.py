@@ -59,21 +59,42 @@ def run(retriever_path, k=50):
         if s is None:
             unlabeled.append(case["id"])
         else:
-            scored.append((case["id"], s))
+            scored.append((case["id"], case.get("type", "semantic"), s))
     return scored, unlabeled
 
 
+METRICS = ["p@10", "r@50", "mrr", "ndcg@10"]
+
+
 def aggregate(scored):
-    keys = ["p@10", "r@50", "mrr", "ndcg@10"]
     if not scored:
-        return {k: 0.0 for k in keys}
-    return {k: sum(s[k] for _, s in scored) / len(scored) for k in keys}
+        return {k: 0.0 for k in METRICS}
+    return {k: sum(s[k] for _, _, s in scored) / len(scored) for k in METRICS}
+
+
+def by_type(scored):
+    """Per-type breakdown. Which *kind* of query fails is the actual roadmap:
+    losing on `semantic` while winning on `exact` means the dense stage is the
+    work, not the ranking."""
+    groups = {}
+    for _, qtype, s in scored:
+        groups.setdefault(qtype, []).append((None, None, s))
+    return {t: (len(g), aggregate(g)) for t, g in sorted(groups.items())}
+
+
+def type_table(groups):
+    head = f"{'type':<13} {'n':>3}  " + "  ".join(f"{m:>7}" for m in METRICS)
+    lines = [head, "-" * len(head)]
+    for t, (n, agg) in groups.items():
+        lines.append(f"{t:<13} {n:>3}  " + "  ".join(f"{agg[m]:>7.4f}" for m in METRICS))
+    return "\n".join(lines)
 
 
 def table(agg, prev=None):
     lines = [f"{'metric':<10} {'value':>8}" + (f" {'delta':>9}" if prev else "")]
     lines.append("-" * len(lines[0]))
-    for k, v in agg.items():
+    for k in METRICS:
+        v = agg[k]
         row = f"{k:<10} {v:>8.4f}"
         if prev:
             d = v - prev.get(k, 0.0)
@@ -104,6 +125,11 @@ def main():
     print(f"labeled queries: {len(scored)}  unlabeled: {len(unlabeled)}\n")
     print(table(agg, prev))
 
+    groups = by_type(scored)
+    if len(groups) > 1:
+        print()
+        print(type_table(groups))
+
     if unlabeled:
         print(f"\nUNLABELED (not scored): {', '.join(unlabeled)}")
         print("Add relevant message ids to eval/gold.jsonl -- unlabeled queries "
@@ -112,7 +138,9 @@ def main():
     if args.save:
         os.makedirs(RESULTS, exist_ok=True)
         with open(os.path.join(RESULTS, args.save + ".json"), "w") as f:
-            json.dump({"retriever": args.retriever, "metrics": agg}, f, indent=2)
+            json.dump({"retriever": args.retriever, "metrics": agg,
+                       "by_type": {t: a for t, (_, a) in by_type(scored).items()}},
+                      f, indent=2)
         print(f"\nsaved snapshot: {args.save}")
 
     # Non-zero exit when nothing is measurable, so agents cannot claim success.
