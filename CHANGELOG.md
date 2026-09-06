@@ -3,6 +3,24 @@
 Notable changes to msgsearch. Retrieval changes carry the measurement that
 justified them; see `ARCHITECTURE.md` for the full evaluation.
 
+## [0.2.1] — 2026-09-06
+
+Documentation only. PyPI freezes a project's description at publish time, so
+correcting the README required a release.
+
+### Fixed
+- The install instructions recommended `pipx install --python <arm64 python>`,
+  which does not work on Apple silicon with an Intel Homebrew. Python from
+  python.org is a universal binary that runs as whichever architecture its
+  parent process is, so an Intel-built pipx launches it as x86_64 whichever
+  interpreter you name, and PyTorch has no x86_64 macOS wheels. The working
+  recipe creates the venv under `arch -arm64`.
+
+### Added
+- A quickstart covering install through first search in one block, and an
+  explicit note that Full Disk Access and Contacts are separate permissions
+  granted to the application rather than the shell.
+
 ## [0.2.0] — 2026-09-06
 
 ### Added

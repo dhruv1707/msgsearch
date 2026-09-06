@@ -17,6 +17,43 @@ up to make committing it difficult. Treat that directory the way you would treat
 password manager's database. Both models run locally, so nothing is uploaded, but
 what lands on your disk is unencrypted.
 
+## Quickstart
+
+```bash
+# 1. install  (needs an arm64 Python — see Install if this errors)
+pipx install msgsearch
+
+# 2. get the embedding model
+#    accept the licence at huggingface.co/google/embeddinggemma-300m, then:
+hf auth login
+
+# 3. snapshot your messages            [needs Full Disk Access]
+msgsearch sync
+
+# 4. check the setup, and fix whatever it names
+msgsearch doctor
+
+# 5. build the index                   [~30 min per 100k messages, once]
+msgsearch index
+
+# 6. search
+msgsearch search "that restaurant we talked about"
+```
+
+Afterwards, one command keeps it current — only genuinely new text is embedded,
+so it takes seconds:
+
+```bash
+msgsearch sync --index
+```
+
+**Two permissions, and they are different.** `sync` needs **Full Disk Access** to
+read `~/Library/Messages`. Resolving names needs **Contacts**. macOS grants both
+to the *application*, not the shell, so if you run from an editor's integrated
+terminal the grant has to go to the editor — Terminal.app is the simple option.
+Both live in System Settings → Privacy & Security, and you must restart the app
+afterwards.
+
 ## Requirements
 
 - **macOS on Apple silicon.** PyTorch no longer publishes x86_64 macOS wheels.
