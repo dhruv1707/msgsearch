@@ -3,6 +3,21 @@
 Notable changes to msgsearch. Retrieval changes carry the measurement that
 justified them; see `ARCHITECTURE.md` for the full evaluation.
 
+## [0.2.0] — 2026-09-06
+
+### Added
+- `msgsearch sync`, which refreshes the working copy of the messages database.
+  `--index` chains straight into a rebuild, so keeping an index current is one
+  command.
+
+### Fixed
+- The documented `cp ~/Library/Messages/chat.db*` could silently lose recent
+  messages. Messages runs SQLite in WAL mode, so the newest messages sit in a
+  `chat.db-wal` sidecar until checkpointed; copying only the main file drops
+  them, and copying a live database at all risks a torn read. `sync` uses
+  SQLite's backup API, which takes a consistent snapshot with the WAL folded in
+  and leaves a single self-contained file.
+
 ## [0.1.0] — 2026-09-06
 
 First release.

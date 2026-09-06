@@ -43,15 +43,23 @@ python3 -m venv .venv                  # must be an arm64 interpreter
 ./.venv/bin/python -m pip install -e ".[dev]"
 ```
 
-Copy the Messages database. **Never point this tool at `~/Library/Messages`**:
-that file is live, Messages.app holds locks on it, and it is irreplaceable.
-Copying requires Full Disk Access for your terminal (System Settings → Privacy &
-Security → Full Disk Access).
+Take a snapshot of the Messages database. **Never point this tool at
+`~/Library/Messages`**: that file is live, Messages.app holds locks on it, and it
+is irreplaceable.
 
 ```bash
-mkdir -p ~/msgsearch
-cp ~/Library/Messages/chat.db* ~/msgsearch/
+msgsearch sync
 ```
+
+This needs Full Disk Access, which macOS grants to the *application* running the
+command (System Settings → Privacy & Security → Full Disk Access). A terminal
+usually has it; an editor's integrated terminal often does not.
+
+It uses SQLite's backup API rather than `cp`, which matters more than it sounds.
+Messages runs in WAL mode, so your most recent messages live in a `chat.db-wal`
+sidecar until they are checkpointed — `cp chat.db` alone loses exactly the
+messages you are most likely to search for, silently. The snapshot folds the
+write-ahead log in and leaves a single self-contained file.
 
 The default embedding model, `google/embeddinggemma-300m`, is gated. You must
 accept the Gemma licence at
@@ -121,6 +129,12 @@ M-series Mac — so restrict it to one conversation while trying things out:
 
 ```bash
 ./.venv/bin/msgsearch index --chat '+15551234567'
+```
+
+When new messages arrive, refresh and re-index:
+
+```bash
+msgsearch sync --index
 ```
 
 Re-running `msgsearch index` later is cheap. Embeddings are cached by passage

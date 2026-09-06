@@ -6,6 +6,7 @@ than a directory of scripts, because it gives people a single thing to remember
 and a single place to find help:
 
     msgsearch doctor               check this machine is set up correctly
+    msgsearch sync                 refresh the copy of the messages database
     msgsearch explore              what is in your database
     msgsearch index                build the search index
     msgsearch search "a query"     search it
@@ -18,6 +19,46 @@ import sys
 from pathlib import Path
 
 from . import __version__, config
+
+
+def _add_sync_command(subparsers) -> None:
+    parser = subparsers.add_parser(
+        "sync",
+        help="refresh the working copy from the live Messages database",
+        description="Take a consistent snapshot of ~/Library/Messages/chat.db. "
+        "Uses SQLite's backup API rather than cp, so the write-ahead log is "
+        "folded in and no sidecar files are needed. Never writes to the live "
+        "database. Requires Full Disk Access.",
+    )
+    parser.add_argument("--source", metavar="PATH", help="the live database")
+    parser.add_argument("--dest", metavar="PATH", help="where to write the copy")
+    parser.add_argument(
+        "--index",
+        action="store_true",
+        help="rebuild the index afterwards (reuses unchanged embeddings)",
+    )
+    parser.set_defaults(handler=_run_sync)
+
+
+def _run_sync(args) -> int:
+    from .sync import describe, snapshot
+
+    try:
+        written = snapshot(args.source, args.dest)
+    except (PermissionError, FileNotFoundError, ValueError) as error:
+        print(error, file=sys.stderr)
+        return 1
+
+    print(f"snapshot written to {written}")
+    print(f"  {describe(written)}")
+
+    if args.index:
+        from .index import build
+
+        build(chat_identifier=config.TESTBED_CHAT, index_dir=None)
+    else:
+        print("\nRun 'msgsearch index' to fold the new messages into the index.")
+    return 0
 
 
 def _add_index_command(subparsers) -> None:
@@ -285,6 +326,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_explore_command(subparsers)
     _add_index_command(subparsers)
     _add_search_command(subparsers)
+    _add_sync_command(subparsers)
     return parser
 
 

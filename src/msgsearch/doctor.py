@@ -75,15 +75,12 @@ def check_database() -> Check:
             "database",
             FAIL,
             f"pointed at the live database ({path})",
-            "That file is live, locked by Messages, and irreplaceable. Copy it: "
-            "mkdir -p ~/msgsearch && cp ~/Library/Messages/chat.db* ~/msgsearch/",
+            "That file is live, locked by Messages, and irreplaceable. Take a "
+            "snapshot instead: msgsearch sync",
         )
 
     if not path.exists():
-        hint = (
-            "mkdir -p ~/msgsearch && cp ~/Library/Messages/chat.db* ~/msgsearch/"
-            "  (needs Full Disk Access for your terminal)"
-        )
+        hint = "msgsearch sync   (needs Full Disk Access for the app running it)"
         return Check("database", FAIL, f"no database at {path}", hint)
 
     try:
