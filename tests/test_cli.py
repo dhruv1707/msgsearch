@@ -73,10 +73,6 @@ class TestEntryPoint(unittest.TestCase):
             cli.main(["nonsense"])
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class TestLoginCommand(unittest.TestCase):
     """Authentication is a msgsearch command because `hf` is not on the PATH.
 
@@ -98,3 +94,7 @@ class TestLoginCommand(unittest.TestCase):
 
     def test_token_is_optional_so_it_can_prompt(self):
         self.assertIsNone(self.parser.parse_args(["login"]).token)
+
+
+if __name__ == "__main__":
+    unittest.main()
