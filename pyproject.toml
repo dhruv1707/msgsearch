@@ -1,0 +1,81 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "msgsearch"
+version = "0.1.0"
+description = "Search your iMessage history by meaning, entirely on your own machine."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10,<3.14"
+keywords = ["imessage", "search", "semantic-search", "local-first", "embeddings"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: MacOS :: MacOS X",
+    "Programming Language :: Python :: 3",
+    "Topic :: Communications :: Chat",
+    "Topic :: Text Processing :: Indexing",
+]
+
+# Pinned rather than ranged: a different embedding model version silently changes
+# every vector in the index, and the failure mode is bad results rather than an
+# error. See ARCHITECTURE.md.
+dependencies = [
+    "numpy==2.5.2",
+    "torch==2.14.0",
+    "sentence-transformers==6.0.1",
+]
+
+[project.optional-dependencies]
+dev = ["ruff==0.15.4"]
+
+[project.urls]
+Homepage = "https://github.com/dhruv1707/msgsearch"
+Documentation = "https://github.com/dhruv1707/msgsearch/blob/main/README.md"
+Issues = "https://github.com/dhruv1707/msgsearch/issues"
+
+[project.scripts]
+msgsearch = "msgsearch.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/msgsearch"]
+
+[tool.ruff]
+line-length = 90
+src = ["src", "tests", "eval"]
+target-version = "py310"
+# Agent hooks and scratch space are tooling, not part of the package, and are not
+# this project's code to reformat.
+extend-exclude = [".claude", ".venv"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "I",    # import sorting
+    "UP",   # pyupgrade
+    "B",    # bugbear
+    "SIM",  # simplify
+    "RUF",
+]
+ignore = [
+    "E501",    # long lines are caught by the formatter, not the linter
+    "B008",
+    # Several predicates here are written as a chain of guard clauses, each
+    # rejecting one specific case with a comment explaining it. Collapsing only
+    # the final branch into `return not (...)` would make it inconsistent with
+    # the guards above and harder to extend.
+    "SIM103",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests deliberately import after mutating sys.path so they run without install.
+"tests/*" = ["E402"]
+"eval/*" = ["E402"]
+
+[tool.ruff.format]
+quote-style = "double"

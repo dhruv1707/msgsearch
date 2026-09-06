@@ -15,13 +15,13 @@ further when they are too long for the embedding model to read.
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Iterable, Iterator, Sequence
+from itertools import pairwise
 
-import config
-import tagging
-from extract import Message
+from . import config, tagging
+from .extract import Message
 
 
 @dataclass(frozen=True)
@@ -105,12 +105,14 @@ def _render(messages: Sequence[Message]) -> tuple[str, tuple[tuple[int, int, int
     return "".join(parts), tuple(offsets)
 
 
-def _split_on_pauses(messages: Sequence[Message], gap_seconds: int) -> list[list[Message]]:
+def _split_on_pauses(
+    messages: Sequence[Message], gap_seconds: int
+) -> list[list[Message]]:
     """Cut a conversation wherever nobody spoke for longer than `gap_seconds`."""
     groups: list[list[Message]] = []
     current: list[Message] = [messages[0]]
 
-    for previous, message in zip(messages, messages[1:]):
+    for previous, message in pairwise(messages):
         if (message.timestamp - previous.timestamp).total_seconds() > gap_seconds:
             groups.append(current)
             current = []
@@ -141,7 +143,7 @@ def _split_oversized(
         # incrementally, because a date header appears only on the first message
         # of each day and that depends on where the piece boundaries fall. These
         # windows are small, so the repeated work is not worth optimising away.
-        if current and _rendered_cost(current + [message]) > budget_chars:
+        if current and _rendered_cost([*current, message]) > budget_chars:
             pieces.append(current)
 
             # Carry a little context forward, but never so much that the overlap
@@ -248,7 +250,9 @@ def windows(
 ) -> Iterator[Window]:
     """Group messages into conversation windows, oldest first."""
     gap_seconds = gap_seconds if gap_seconds is not None else config.WINDOW_GAP_SECONDS
-    token_budget = token_budget if token_budget is not None else config.WINDOW_TOKEN_BUDGET
+    token_budget = (
+        token_budget if token_budget is not None else config.WINDOW_TOKEN_BUDGET
+    )
     overlap = overlap if overlap is not None else config.WINDOW_OVERLAP_MESSAGES
     budget_chars = token_budget * config.CHARS_PER_TOKEN
 

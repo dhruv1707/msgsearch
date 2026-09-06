@@ -48,13 +48,12 @@ def main():
     print(f"size:     {os.path.getsize(DB_PATH) / 1e6:.1f} MB")
     print()
 
-    total, = cur.execute("SELECT count(*) FROM message").fetchone()
-    null_text, = cur.execute(
+    (total,) = cur.execute("SELECT count(*) FROM message").fetchone()
+    (null_text,) = cur.execute(
         "SELECT count(*) FROM message WHERE text IS NULL"
     ).fetchone()
-    null_text_with_body, = cur.execute(
-        "SELECT count(*) FROM message "
-        "WHERE text IS NULL AND attributedBody IS NOT NULL"
+    (null_text_with_body,) = cur.execute(
+        "SELECT count(*) FROM message WHERE text IS NULL AND attributedBody IS NOT NULL"
     ).fetchone()
     unrecoverable = null_text - null_text_with_body
 
@@ -63,11 +62,19 @@ def main():
 
     print("== message volume ==")
     print(f"total messages ............................. {total:>9,}")
-    print(f"  text IS NULL ............................. {null_text:>9,}  ({pct(null_text, total)} of total)")
-    print(f"    ...but attributedBody IS NOT NULL ...... {null_text_with_body:>9,}  ({pct(null_text_with_body, null_text)} of NULL-text)")
-    print(f"    ...and no attributedBody either ........ {unrecoverable:>9,}  ({pct(unrecoverable, null_text)} of NULL-text)")
+    print(
+        f"  text IS NULL ............................. {null_text:>9,}  ({pct(null_text, total)} of total)"
+    )
+    print(
+        f"    ...but attributedBody IS NOT NULL ...... {null_text_with_body:>9,}  ({pct(null_text_with_body, null_text)} of NULL-text)"
+    )
+    print(
+        f"    ...and no attributedBody either ........ {unrecoverable:>9,}  ({pct(unrecoverable, null_text)} of NULL-text)"
+    )
     recoverable = total - unrecoverable
-    print(f"messages with recoverable text ............. {recoverable:>9,}  ({pct(recoverable, total)} of total)")
+    print(
+        f"messages with recoverable text ............. {recoverable:>9,}  ({pct(recoverable, total)} of total)"
+    )
     print()
 
     print("== date range (message.date, Apple epoch 2001-01-01) ==")
@@ -81,10 +88,12 @@ def main():
     if lo and hi:
         span = apple_ts(hi) - apple_ts(lo)
         print(f"span ....... {span.days:,} days (~{span.days / 365.25:.1f} years)")
-    ns_rows, = cur.execute(
+    (ns_rows,) = cur.execute(
         "SELECT count(*) FROM message WHERE date IS NOT NULL AND abs(date) > 1000000000000"
     ).fetchone()
-    print(f"nanosecond-scale rows ... {ns_rows:,} / second-scale rows ... {total - ns_rows:,}")
+    print(
+        f"nanosecond-scale rows ... {ns_rows:,} / second-scale rows ... {total - ns_rows:,}"
+    )
     print()
 
     print("== top 10 chats by message count ==")
@@ -124,13 +133,21 @@ def main():
         ("distinct chats", "SELECT count(*) FROM chat"),
         ("distinct handles (senders)", "SELECT count(*) FROM handle"),
         ("messages from me", "SELECT count(*) FROM message WHERE is_from_me = 1"),
-        ("messages with attachments", "SELECT count(*) FROM message WHERE cache_has_attachments = 1"),
-        ("reactions/tapbacks", "SELECT count(*) FROM message WHERE associated_message_type != 0"),
-        ("orphan messages (no chat)",
-         "SELECT count(*) FROM message m LEFT JOIN chat_message_join cmj "
-         "ON cmj.message_id = m.ROWID WHERE cmj.chat_id IS NULL"),
+        (
+            "messages with attachments",
+            "SELECT count(*) FROM message WHERE cache_has_attachments = 1",
+        ),
+        (
+            "reactions/tapbacks",
+            "SELECT count(*) FROM message WHERE associated_message_type != 0",
+        ),
+        (
+            "orphan messages (no chat)",
+            "SELECT count(*) FROM message m LEFT JOIN chat_message_join cmj "
+            "ON cmj.message_id = m.ROWID WHERE cmj.chat_id IS NULL",
+        ),
     ]:
-        n, = cur.execute(sql).fetchone()
+        (n,) = cur.execute(sql).fetchone()
         print(f"{label:.<45} {n:>9,}")
 
     conn.close()

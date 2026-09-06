@@ -17,13 +17,14 @@ from __future__ import annotations
 
 import sqlite3
 from collections import defaultdict
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Iterator
 
-import config
-from attributed_body import message_text
+from . import config
+from .attributed_body import message_text
+from .contacts import Contacts
 
 # Apple stores timestamps as nanoseconds since this moment, not since 1970.
 APPLE_EPOCH = datetime(2001, 1, 1, tzinfo=timezone.utc)
@@ -94,8 +95,13 @@ def load_handles(conn: sqlite3.Connection) -> dict[int, str]:
     return {rowid: addr for rowid, addr in conn.execute("SELECT ROWID, id FROM handle")}
 
 
-def load_chats(conn: sqlite3.Connection, handles: dict[int, str]) -> dict[int, Chat]:
+def load_chats(
+    conn: sqlite3.Connection,
+    handles: dict[int, str],
+    contacts: Contacts | None = None,
+) -> dict[int, Chat]:
     """Map chat ROWID to a display label and whether it is a group."""
+    contacts = contacts if contacts is not None else Contacts()
     participants: dict[int, list[int]] = defaultdict(list)
     for chat_id, handle_id in conn.execute(
         "SELECT chat_id, handle_id FROM chat_handle_join"
@@ -111,12 +117,16 @@ def load_chats(conn: sqlite3.Connection, handles: dict[int, str]) -> dict[int, C
 
         # Most groups here are unnamed, so fall back to listing who is in them.
         if not label and is_group:
-            members = [handles.get(h, "?") for h in participants.get(rowid, [])]
+            members = [
+                contacts.label(handles.get(h, "?")) for h in participants.get(rowid, [])
+            ]
             label = ", ".join(members[:3])
             if len(members) > 3:
                 label += f" +{len(members) - 3}"
 
-        chats[rowid] = Chat(rowid, label or identifier or f"chat {rowid}", is_group)
+        if not label and identifier:
+            label = contacts.label(identifier)
+        chats[rowid] = Chat(rowid, label or f"chat {rowid}", is_group)
     return chats
 
 
@@ -163,17 +173,23 @@ _CHAT_FILTER = """
 def iter_messages(
     conn: sqlite3.Connection | None = None,
     chat_identifier: str | None = None,
+    contacts: Contacts | None = None,
 ) -> Iterator[Message]:
     """Yield every indexable message, oldest first.
 
     `chat_identifier` restricts the results to a single conversation, which is how
     the testbed thread is indexed without processing the whole archive.
+
+    `contacts` maps handles to names. It defaults to the alias file, so speakers
+    appear as "Sam" rather than "+15551234567" — which reads better and, because
+    the speaker label is part of what gets embedded, retrieves better too.
     """
     own_connection = conn is None
     conn = conn or connect()
+    contacts = contacts if contacts is not None else Contacts.load()
     try:
         handles = load_handles(conn)
-        chats = load_chats(conn, handles)
+        chats = load_chats(conn, handles, contacts)
         attachments = load_attachments(conn)
 
         sql = _MESSAGE_SQL.format(chat_filter=_CHAT_FILTER if chat_identifier else "")
@@ -184,8 +200,18 @@ def iter_messages(
         seen: set[int] = set()
 
         for row in conn.execute(sql, params):
-            (rowid, guid, chat_id, date, is_from_me, handle_id,
-             service, text, blob, reply_to) = row
+            (
+                rowid,
+                guid,
+                chat_id,
+                date,
+                is_from_me,
+                handle_id,
+                service,
+                text,
+                blob,
+                reply_to,
+            ) = row
 
             if rowid in seen:
                 continue
@@ -205,7 +231,11 @@ def iter_messages(
                 chat_is_group=chat.is_group,
                 timestamp=apple_timestamp(date),
                 is_from_me=bool(is_from_me),
-                speaker=SELF if is_from_me else handles.get(handle_id, "unknown"),
+                speaker=(
+                    SELF
+                    if is_from_me
+                    else contacts.label(handles.get(handle_id, "unknown"))
+                ),
                 service=service or "unknown",
                 text=body,
                 reply_to=reply_to,

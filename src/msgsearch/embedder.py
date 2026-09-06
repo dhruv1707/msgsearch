@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import numpy as np
 
-import config
+from . import config
 
 
 def _load_failure_hint(model_name: str, error: Exception) -> str:

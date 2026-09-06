@@ -4,13 +4,9 @@ Every fixture here is invented. Nothing in this file may come from a real
 message, because this file is published.
 """
 
-import sys
 import unittest
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-import tagging
+from msgsearch import tagging
 
 
 class TestBareUrl(unittest.TestCase):
