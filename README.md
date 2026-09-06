@@ -122,49 +122,60 @@ arch -arm64 python3 -m venv .venv          # must be an arm64 interpreter
 
 ## Setup
 
-Get access to the embedding model. `google/embeddinggemma-300m` is gated, so:
+### 1. Model access
 
-1. Accept the licence at <https://huggingface.co/google/embeddinggemma-300m>
-2. Create a read token at <https://huggingface.co/settings/tokens>
-3. Run `msgsearch login` and paste it
+The default embedding model, `google/embeddinggemma-300m`, is gated: Google
+requires you to accept its licence before downloading. This is a one-time thing.
 
-`msgsearch login` checks afterwards that you can actually reach the model, since
-being logged in and having accepted the licence are different things — and the
-failure for the second looks identical to the first.
+1. **Create a HuggingFace account** if you do not have one — <https://huggingface.co/join>. Free.
+2. **Accept the licence.** Open <https://huggingface.co/google/embeddinggemma-300m>,
+   sign in, and click the button acknowledging the Gemma terms at the top of the
+   page. Approval is normally immediate.
+3. **Create a token.** Go to <https://huggingface.co/settings/tokens>, click
+   *Create new token*, give it the **Read** role, and copy it. It looks like
+   `hf_...`.
+4. **Log in:**
 
-Any sentence-transformers model works instead, for example
-`MSGSEARCH_EMBED_MODEL=BAAI/bge-small-en-v1.5`.
+   ```bash
+   msgsearch login
+   ```
 
-Take a snapshot of the Messages database. **Never point this tool at
-`~/Library/Messages`**: that file is live, Messages.app holds locks on it, and it
-is irreplaceable.
+   Paste the token when prompted. It is stored in `~/.cache/huggingface`, not by
+   msgsearch. You can also pass it directly with `msgsearch login --token hf_...`.
+
+`msgsearch login` checks afterwards that the model is genuinely reachable, rather
+than only that the token is valid. Those are different conditions — you can be
+perfectly logged in and still be refused because step 2 was skipped — and
+HuggingFace reports both as the same 401 saying "please log in", which sends
+people back to re-do the step they already did.
+
+The model itself downloads automatically the first time you index, about 1.2 GB,
+cached in `~/.cache/huggingface`. There is no separate download step.
+
+**Don't want a HuggingFace account?** Use an ungated model instead. Retrieval is
+somewhat weaker, but nothing else changes:
+
+```bash
+export MSGSEARCH_EMBED_MODEL=BAAI/bge-small-en-v1.5
+```
+
+### 2. Snapshot your messages
+
+**Never point this tool at `~/Library/Messages`** — that file is live, Messages
+holds locks on it, and it is irreplaceable.
 
 ```bash
 msgsearch sync
 ```
 
-This needs Full Disk Access, which macOS grants to the *application* running the
-command (System Settings → Privacy & Security → Full Disk Access). A terminal
-usually has it; an editor's integrated terminal often does not.
+This needs Full Disk Access (see above for how to grant it). It uses SQLite's
+backup API rather than `cp`, which matters more than it sounds: Messages runs in
+WAL mode, so your most recent messages live in a `chat.db-wal` sidecar until they
+are checkpointed. `cp chat.db` alone drops exactly the messages you are most
+likely to search for, silently. The snapshot folds the write-ahead log in and
+leaves a single self-contained file.
 
-It uses SQLite's backup API rather than `cp`, which matters more than it sounds.
-Messages runs in WAL mode, so your most recent messages live in a `chat.db-wal`
-sidecar until they are checkpointed — `cp chat.db` alone loses exactly the
-messages you are most likely to search for, silently. The snapshot folds the
-write-ahead log in and leaves a single self-contained file.
-
-The default embedding model, `google/embeddinggemma-300m`, is gated. You must
-accept the Gemma licence at
-<https://huggingface.co/google/embeddinggemma-300m> and authenticate:
-
-```bash
-./.venv/bin/msgsearch login
-```
-
-Any sentence-transformers model works instead if you would rather not, for example
-`MSGSEARCH_EMBED_MODEL=BAAI/bge-small-en-v1.5`.
-
-### Names
+### 3. Names (optional)
 
 Without names, speakers appear as phone numbers. Resolving them makes results
 readable *and* improves retrieval, because the speaker label is part of the text

@@ -3,6 +3,21 @@
 Notable changes to msgsearch. Retrieval changes carry the measurement that
 justified them; see `ARCHITECTURE.md` for the full evaluation.
 
+## [0.2.4] — 2026-09-06
+
+Documentation only; released because PyPI freezes a project's description at
+publish time.
+
+### Fixed
+- The Setup section explained the gated model twice, and the second copy used a
+  development path (`./.venv/bin/msgsearch`) that an installed user does not have.
+- Model access is now spelled out step by step: create an account, accept the
+  Gemma licence, create a **Read** token, run `msgsearch login`. It previously
+  assumed a HuggingFace account already existed and did not say which kind of
+  token to make.
+- States explicitly that the model downloads automatically on first index, about
+  1.2 GB, so nobody goes looking for a download step that does not exist.
+
 ## [0.2.3] — 2026-09-06
 
 ### Fixed
