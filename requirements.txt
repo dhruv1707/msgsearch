@@ -1,0 +1,12 @@
+# Requires an arm64 Python 3.12 or 3.13. PyTorch no longer publishes x86_64
+# macOS wheels, so an Intel-built interpreter (common under /usr/local on Apple
+# Silicon) cannot install torch and cannot use the GPU even if it could.
+numpy==2.5.2
+torch==2.14.0
+sentence-transformers==6.0.1
+
+# Pulled in by sentence-transformers; pinned so a rebuild is reproducible.
+transformers==5.16.1
+tokenizers==0.23.2
+safetensors==0.8.0
+scipy==1.18.1

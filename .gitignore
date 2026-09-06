@@ -1,8 +1,20 @@
-__pycache__/
-*.pyc
+# Message data and anything derived from it must never be committed. The index is
+# a plaintext, searchable copy of every private thing anyone has ever texted you.
+*.db
+*.db-shm
+*.db-wal
+*.npy
+*.npz
+index/
+msgsearch_index/
+
+# Local configuration holds phone numbers and email addresses.
+config_local.py
+
+# Environments and build noise
 .venv/
-index.sqlite
-index.sqlite-*
-models/
-.claude/settings.local.json
-eval/results/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.DS_Store

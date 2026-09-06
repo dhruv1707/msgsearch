@@ -9,7 +9,7 @@ makes labeling 271k messages tractable.
     python3 eval/label.py --relabel q1
 
 Prints message bodies to YOUR terminal only. Nothing is written to the repo except
-message ids -- gold.jsonl never contains message text.
+window ids -- gold.jsonl never contains message text.
 """
 
 import argparse
@@ -22,9 +22,14 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 GOLD = os.path.join(ROOT, "eval", "gold.jsonl")
-INDEX = os.environ.get("MSGSEARCH_INDEX", os.path.join(ROOT, "index.sqlite"))
+INDEX = os.path.join(
+    os.path.expanduser(os.environ.get("MSGSEARCH_INDEX", "~/msgsearch/index")), "index.db")
 
-RETRIEVERS = ["search.lexical"]  # add dense/hybrid here as they land
+# Pool from the two *retrieval* stages, deliberately not from the full reranked
+# pipeline: pooling from the thing you are about to score biases the gold set
+# toward whatever the current ranking already prefers. Diverse pools are the
+# whole point of TREC-style pooling.
+RETRIEVERS = ["eval.retriever_bm25", "eval.retriever_dense"]
 
 # qmd's taxonomy, adapted to messages. Purely for grouping -- it does not change
 # search behaviour, it tells you *which kind* of query a retriever fails on.
@@ -53,11 +58,12 @@ def pool(query, per_retriever=15):
 
 
 def bodies(ids):
+    """Window summaries for the pooled candidates, keyed by window_id."""
     db = sqlite3.connect(f"file:{INDEX}?mode=ro", uri=True)
     q = ",".join("?" * len(ids))
     rows = db.execute(
-        f"SELECT id, ts, chat_label, is_from_me, body FROM messages WHERE id IN ({q})",
-        ids).fetchall()
+        f"""SELECT window_id, start_ts, chat_label, n_messages, tags, search_text
+            FROM windows WHERE window_id IN ({q})""", ids).fetchall()
     db.close()
     return {r[0]: r for r in rows}
 
@@ -91,16 +97,19 @@ def main():
     meta = bodies(ids)
 
     print(f"\nquery: {query!r}   ({len(ids)} pooled candidates)\n")
-    for n, mid in enumerate(ids, 1):
-        row = meta.get(mid)
+    for n, wid in enumerate(ids, 1):
+        row = meta.get(wid)
         if not row:
             continue
-        _, ts, chat, from_me, body = row
-        who = "me" if from_me else (chat or "?")
-        snippet = body.replace("\n", " ")[:110]
-        print(f"[{n:>2}] {mid:<8} {(ts or '')[:10]}  {who[:18]:<18}  {snippet}")
+        _, ts, chat, n_msgs, tags, text = row
+        tag = f"[{tags}]" if tags else ""
+        snippet = " ".join(text.split())[:120]
+        print(f"[{n:>2}] {wid:<14} {(ts or '')[:10]}  {(chat or '?')[:16]:<16} "
+              f"{n_msgs:>3}msg {tag}")
+        print(f"     {snippet}")
 
-    print("\nEnter the numbers that actually answer the query (e.g. 1 4 7), or blank for none.")
+    print("\nEnter the numbers whose conversation actually answers the query "
+          "(e.g. 1 4 7), or blank for none.")
     picks = input("> ").split()
     relevant = [ids[int(p) - 1] for p in picks if p.isdigit() and 1 <= int(p) <= len(ids)]
 

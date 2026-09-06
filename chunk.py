@@ -182,6 +182,64 @@ def build_window(messages: Sequence[Message]) -> Window:
     )
 
 
+@dataclass(frozen=True)
+class Passage:
+    """A small slice of a window, and the thing that actually gets embedded.
+
+    A window is the right unit to show a person, because it carries the context
+    that makes a result make sense. It is the wrong unit to embed, because a
+    single vector for thirty messages on eight topics represents none of them
+    well. Passages slide across the window in small overlapping steps so that
+    every message sits near the middle of at least one of them, and each passage
+    remembers which window it belongs to.
+    """
+
+    passage_id: str
+    window_id: str
+    chat_id: int
+    text: str
+    rowids: tuple[int, ...]
+
+
+def passages(
+    window: Window, size: int | None = None, stride: int | None = None
+) -> list[Passage]:
+    """Slice a window into overlapping passages for embedding."""
+    size = size if size is not None else config.PASSAGE_MESSAGES
+    stride = stride if stride is not None else config.PASSAGE_STRIDE
+
+    # Link-only messages are dropped here for the same reason they are dropped
+    # from embed_text: a bare URL gives the model nothing to work with.
+    speaking = [m for m in window.messages if not tagging.is_bare_url(m.text)]
+    if not speaking:
+        return []
+
+    if len(speaking) <= size:
+        starts = [0]
+    else:
+        starts = list(range(0, len(speaking) - size + 1, stride))
+        # Make sure the final messages are covered even when the stride does not
+        # divide the window evenly.
+        last = len(speaking) - size
+        if starts[-1] != last:
+            starts.append(last)
+
+    out = []
+    for start in starts:
+        selected = speaking[start : start + size]
+        text, _ = _render(selected)
+        out.append(
+            Passage(
+                passage_id=f"{window.window_id}#{start}",
+                window_id=window.window_id,
+                chat_id=window.chat_id,
+                text=text,
+                rowids=tuple(m.rowid for m in selected),
+            )
+        )
+    return out
+
+
 def windows(
     messages: Iterable[Message],
     gap_seconds: int | None = None,

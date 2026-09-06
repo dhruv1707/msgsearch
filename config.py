@@ -42,9 +42,23 @@ WINDOW_OVERLAP_MESSAGES = 2
 # approximate: the real tokenizer is not loaded during chunking.
 CHARS_PER_TOKEN = 4
 
+# --- passages ----------------------------------------------------------------
+
+# What actually gets embedded. A whole conversation window is the right unit to
+# *show* someone, but the wrong unit to embed: compressing thirty-odd messages on
+# mixed topics into one vector buries any specific fact in them. Measured on real
+# data, embedding a 3-message neighbourhood moved a target from rank 3539 to rank
+# 13, while embedding the single message on its own was worst of all at 5117.
+# So passages are small, they slide across the window, and each one points back
+# at the window it came from for display.
+PASSAGE_MESSAGES = 3
+PASSAGE_STRIDE = 1
+
 # --- models ------------------------------------------------------------------
 
-EMBED_MODEL = os.environ.get("MSGSEARCH_EMBED_MODEL", "google/embeddinggemma-300m")
+# embeddinggemma-300m is a gated HuggingFace repo and 401s without an access
+# token, so it cannot be the default. Override once you have accepted its terms.
+EMBED_MODEL = os.environ.get("MSGSEARCH_EMBED_MODEL", "BAAI/bge-small-en-v1.5")
 RERANK_MODEL = os.environ.get("MSGSEARCH_RERANK_MODEL", "BAAI/bge-reranker-v2-m3")
 
 # --- retrieval ---------------------------------------------------------------

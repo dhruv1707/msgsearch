@@ -1,0 +1,9 @@
+{
+  "retriever": "search.lexical",
+  "metrics": {
+    "p@10": 0.0,
+    "r@50": 0.0,
+    "mrr": 0.0,
+    "ndcg@10": 0.0
+  }
+}
