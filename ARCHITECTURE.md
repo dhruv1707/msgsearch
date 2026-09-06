@@ -38,9 +38,9 @@ Two files in `~/msgsearch/index/`, outside the repo:
 
 qmd keeps vectors inside SQLite via `sqlite-vec`, and that remains the right call
 at document scale. It is not yet worth it here. With ~95k passages a search is a
-single `numpy` matrix multiply over a 95k×384 array, which completes in single-digit
+single `numpy` matrix multiply over a 95k×768 array, which completes in single-digit
 milliseconds — faster than an ANN index once its own overhead is counted, and it
-avoids a dependency. Revisit if the full-corpus index (all 719 chats) makes the
+avoids a dependency. Revisit if the full-corpus index (398 chats with indexable messages) makes the
 array unwieldy, which is the point where ANN starts to earn its keep.
 
 | table | role |
@@ -104,15 +104,18 @@ Each stage ships only when the eval says it beat the previous one.
    one best passage per window before fusion, so the shortlist holds distinct
    conversations. *(shipped)*
 4. **Rerank** — cross-encoder over the top ~50, scoring the query against each
-   candidate's best *passage* rather than its whole window, for the same dilution
-   reason. *(shipped)*
+   candidate's best *passage* rather than its whole window. **Implemented and
+   disabled by default**, because measuring it showed it makes results worse:
+   MRR falls from 0.843 to 0.700 and nDCG@10 from 0.811 to 0.677, with the damage
+   concentrated on topical queries (nDCG 0.790 → 0.521). It takes rankings fusion
+   already got right and scrambles them. These rerankers are trained on clean QA
+   passages, and a window of "Yaaa bro I do" is far outside that distribution.
    - qmd blends reranker and retrieval scores by position — trusting retrieval
      more at the top (75/25 for ranks 1–3) and the reranker more further down
-     (40/60 past rank 11) — which preserves exact matches that BM25 got right.
-     **Not yet adopted**; the reranker currently overrides outright. Worth testing
-     once `gold.jsonl` exists: on the one query measured so far, fusion alone
-     ranked the target 3rd and the reranker moved it to 2nd, so there is no
-     evidence either way yet.
+     (40/60 past rank 11) — which is designed to prevent exactly the failure
+     measured above. **Untested here.** It is the obvious thing to try before
+     concluding the stage is worthless; the current implementation lets the
+     reranker override outright, which is the version that lost.
 5. **Query expansion** — only if stages 1–4 plateau. Highest cost, least certain
    payoff.
 
@@ -138,12 +141,11 @@ a classification head, which is why it is ~28× slower than MiniLM. It loads
 through `CrossEncoder` and applies its own `query` prompt automatically; sanity
 checks on obvious relevant/irrelevant pairs order correctly with a wide margin.
 
-**All three produce the same ranking, and so does skipping the stage entirely.**
-On the single query evaluated, RRF fusion already places the target at rank 2 and
-no reranker moves it. This is not evidence the stage is worthless — reranking
-earns its keep on ambiguous queries, and n=1 settles nothing — but it is currently
-4.2s of latency per search with no measured benefit. First thing to test once
-`gold.jsonl` has labels.
+On a single hand-checked query all three produced identical rankings, which
+looked like evidence the stage was merely redundant. The 9-query gold set showed
+it is actively harmful — see stage 4 above. This is the clearest case in the
+project of one query being worse than no measurement at all, because it produced
+false confidence rather than acknowledged ignorance.
 
 **EmbeddingGemma requires task-specific prompt prefixes.** Queries and documents
 are presented to it differently, and that asymmetry is what teaches it to place a
@@ -182,6 +184,8 @@ Deliberately *not* taken:
 | `sqlite-vec` | brute force is faster at 95k passages; revisit at full-corpus scale |
 | `llama-cpp-python` | would duplicate torch, which is already required |
 
+Declared in `pyproject.toml`, pinned rather than ranged: a different embedding model version silently changes every vector in the index, and the failure mode is bad results rather than an error.
+
 **Requires an arm64 Python.** PyTorch no longer publishes x86_64 macOS wheels, and
 a Rosetta process cannot use the GPU regardless. The system `python3` at
 `/usr/local` on this machine is an Intel build and cannot be used.
@@ -197,7 +201,49 @@ Gold labels are message **ids only**; no text is committed.
 Target: ~30–50 labeled queries before any retrieval number is trustworthy. Below
 ~20, the metrics are noise.
 
-**Status: not yet built.** Every retrieval claim in this document rests on a single
-hand-checked query, which is below that bar and is marked as such where it appears.
-The passage-vs-window decision in particular needs re-testing once gold labels
+**Status: 9 labelled queries** — 1 exact, 5 semantic, 3 topical, and none yet of
+the `cross-domain` or `alias` kinds. Measured on the full corpus (398 chats,
+260,347 messages, 27,551 windows, 220,225 passages):
+
+| retriever | r@50 | MRR | nDCG@10 |
+|---|---|---|---|
+| **hybrid (default)** | 0.972 | **0.673** | **0.725** |
+| keyword only | 1.000 | 0.501 | 0.539 |
+| vectors only | 0.903 | 0.537 | 0.519 |
+
+Fusion still beats both of its inputs, which is the result that matters.
+
+### Why these numbers are lower than the earlier ones
+
+An earlier snapshot showed MRR 0.843. That was measured on an index containing a
+single conversation and using phone numbers as speaker labels. Moving to the full
+corpus with resolved names costs 0.169, decomposed by a controlled rebuild:
+
+| condition | MRR |
+|---|---|
+| one chat, phone numbers (the old baseline) | 0.843 |
+| one chat, **with names** | 0.782 |
+| full corpus, with names | 0.673 |
+
+About a third of the loss is naming and two thirds is corpus growth.
+
+**The corpus two-thirds is not a quality regression.** `gold.jsonl` was labelled by
+pooling candidates from the single-conversation index, so relevant windows in the
+other 397 conversations were never surfaced, never judged, and are scored as
+irrelevant. The metric understates quality on the full corpus by an unknown
+amount. Re-pool and re-judge against the current index before drawing conclusions
+from the absolute numbers; the comparisons between retrievers remain valid,
+because they all run against the same labels.
+
+**The naming third is a real cost, accepted deliberately.** Resolved names make
+results readable and make `--from` work, and the speaker label is part of the
+embedded text, so changing it changes every vector. Worth testing later: keep
+names for display and keyword search but embed a neutral role label instead, which
+might recover the 0.061 while keeping the benefits. Untested — it needs a full
+rebuild to find out.
+
+Still resting on one query, and flagged where they appear: the passage size of 3,
+the stride of 1, the 30-minute window gap, `RRF_K = 60`, and the claim that
+EmbeddingGemma beats bge-small. The passage-vs-window decision in particular needs
+re-testing once gold labels
 exist.

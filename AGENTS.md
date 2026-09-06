@@ -31,14 +31,20 @@ Use `./.venv/bin/python` — it is the arm64 interpreter. The system `python3` i
 Intel build and cannot install torch.
 
 ```bash
-./.venv/bin/python explore.py                    # structural recon
-./.venv/bin/python index.py                      # rebuild ~/msgsearch/index/
-./.venv/bin/python search.py "atria login"       # query it
+./.venv/bin/msgsearch doctor                     # setup preflight
+./.venv/bin/msgsearch contacts --unresolved      # unnamed handles by volume
+./.venv/bin/msgsearch explore                    # structural recon
+./.venv/bin/msgsearch index                      # rebuild ~/msgsearch/index/
+./.venv/bin/msgsearch search "atria login"       # query it
+
+./.venv/bin/ruff check . && ./.venv/bin/ruff format --check .
 ./.venv/bin/python -m unittest discover -s tests
 
 ./.venv/bin/python eval/label.py "a query"       # add a labeled gold query
 ./.venv/bin/python eval/bench.py -r eval.retriever --against baseline
 ```
+
+Code lives in `src/msgsearch/`; install it with `pip install -e ".[dev]"` once.
 
 Retriever variants for `-r`, to score one stage at a time:
 `eval.retriever` (full) · `eval.retriever_bm25` · `eval.retriever_dense` ·

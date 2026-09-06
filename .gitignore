@@ -3,6 +3,8 @@
 *.db
 *.db-shm
 *.db-wal
+*.sqlite
+*.sqlite3
 *.npy
 *.npz
 index/
@@ -10,6 +12,11 @@ msgsearch_index/
 
 # Local configuration holds phone numbers and email addresses.
 config_local.py
+
+# Build artefacts
+dist/
+build/
+*.egg-info/
 
 # Environments and build noise
 .venv/
