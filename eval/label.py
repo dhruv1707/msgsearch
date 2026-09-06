@@ -23,7 +23,8 @@ sys.path.insert(0, ROOT)
 
 GOLD = os.path.join(ROOT, "eval", "gold.jsonl")
 INDEX = os.path.join(
-    os.path.expanduser(os.environ.get("MSGSEARCH_INDEX", "~/msgsearch/index")), "index.db")
+    os.path.expanduser(os.environ.get("MSGSEARCH_INDEX", "~/msgsearch/index")), "index.db"
+)
 
 # Pool from the two *retrieval* stages, deliberately not from the full reranked
 # pipeline: pooling from the thing you are about to score biases the gold set
@@ -45,8 +46,11 @@ TYPES = {
 def pool(query, per_retriever=15):
     """Union the top hits of each retrieval stage, keeping the text that matched."""
     from eval import retriever
-    stages = [("bm25", dict(no_dense=True, no_rerank=True)),
-              ("dense", dict(no_bm25=True, no_rerank=True))]
+
+    stages = [
+        ("bm25", dict(no_dense=True, no_rerank=True)),
+        ("dense", dict(no_bm25=True, no_rerank=True)),
+    ]
     seen, ordered, matched = set(), [], {}
     for _, flags in stages:
         for wid, text in retriever.search_detailed(query, per_retriever, **flags):
@@ -63,7 +67,9 @@ def bodies(ids):
     q = ",".join("?" * len(ids))
     rows = db.execute(
         f"""SELECT window_id, start_ts, chat_label, n_messages, tags, search_text
-            FROM windows WHERE window_id IN ({q})""", ids).fetchall()
+            FROM windows WHERE window_id IN ({q})""",
+        ids,
+    ).fetchall()
     db.close()
     return {r[0]: r for r in rows}
 
@@ -78,7 +84,7 @@ def main():
     gold = []
     if os.path.exists(GOLD):
         with open(GOLD) as f:
-            gold = [json.loads(l) for l in f if l.strip()]
+            gold = [json.loads(line) for line in f if line.strip()]
 
     if args.relabel:
         case = next((c for c in gold if c["id"] == args.relabel), None)
@@ -101,15 +107,17 @@ def main():
         row = meta.get(wid)
         if not row:
             continue
-        _, ts, chat, n_msgs, tags, _full = row
+        _, ts, _chat, n_msgs, tags, _full = row
         tag = f"[{tags}]" if tags else ""
         # Show the text from the matched message onward, not the window's head.
         snippet = " ".join(matched.get(wid, "").split())[:170]
         print(f"[{n:>2}] {wid:<14} {(ts or '')[:10]}  {n_msgs:>3}msg {tag}")
         print(f"     {snippet}")
 
-    print("\nEnter the numbers whose conversation actually answers the query "
-          "(e.g. 1 4 7), or blank for none.")
+    print(
+        "\nEnter the numbers whose conversation actually answers the query "
+        "(e.g. 1 4 7), or blank for none."
+    )
     print("Type ?N (e.g. ?7) to read a whole conversation first.")
     while True:
         raw = input("> ").strip()

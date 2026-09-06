@@ -32,9 +32,18 @@ _state = {}
 
 def _args(limit, **overrides):
     a = argparse.Namespace(
-        limit=limit, chat=None, from_=None, after=None, before=None, type=None,
-        index_dir=None, snippet=1200, full=False,
-        no_rerank=False, no_dense=False, no_bm25=False,
+        limit=limit,
+        chat=None,
+        from_=None,
+        after=None,
+        before=None,
+        type=None,
+        index_dir=None,
+        snippet=1200,
+        full=False,
+        no_rerank=False,
+        no_dense=False,
+        no_bm25=False,
     )
     for key, value in overrides.items():
         setattr(a, key, value)
@@ -44,8 +53,9 @@ def _args(limit, **overrides):
 def _pipeline():
     """Load index, vectors and the embedding model once, then reuse them."""
     if not _state:
-        import search as S
-        from embedder import Embedder
+        from msgsearch import search as S
+        from msgsearch.embedder import Embedder
+
         db, vectors = S.open_index()
         _state.update(S=S, db=db, vectors=vectors, embedder=Embedder())
     return _state
@@ -57,8 +67,11 @@ def search_detailed(query, k=50, **overrides):
     retrieved, so the labeler shows this instead."""
     p = _pipeline()
     results = p["S"].search(
-        query, _args(k, **overrides),
-        db=p["db"], vectors=p["vectors"], embedder=p["embedder"],
+        query,
+        _args(k, **overrides),
+        db=p["db"],
+        vectors=p["vectors"],
+        embedder=p["embedder"],
     )
     return [(r.window_id, p["S"].anchored_text(r)) for r in results]
 
@@ -66,8 +79,11 @@ def search_detailed(query, k=50, **overrides):
 def search(query, k=50, **overrides):
     p = _pipeline()
     results = p["S"].search(
-        query, _args(k, **overrides),
-        db=p["db"], vectors=p["vectors"], embedder=p["embedder"],
+        query,
+        _args(k, **overrides),
+        db=p["db"],
+        vectors=p["vectors"],
+        embedder=p["embedder"],
     )
     # Position is the real signal; the score is for display and some stages
     # leave it unset, so fall back to descending rank.

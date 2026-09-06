@@ -5,7 +5,7 @@ Run this before every commit that touches retrieval. A retrieval change with no
 movement here is an unverified guess, not an improvement.
 
     python3 eval/bench.py                          # default retriever
-    python3 eval/bench.py -r search.lexical        # pick a retriever module
+    python3 eval/bench.py -r eval.retriever_bm25   # pick a retriever module
     python3 eval/bench.py --save baseline          # snapshot metrics
     python3 eval/bench.py --against baseline       # diff vs a snapshot
 
@@ -105,7 +105,7 @@ def table(agg, prev=None):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("-r", "--retriever", default="search.lexical")
+    ap.add_argument("-r", "--retriever", default="eval.retriever")
     ap.add_argument("--save", metavar="NAME")
     ap.add_argument("--against", metavar="NAME")
     args = ap.parse_args()
@@ -117,7 +117,8 @@ def main():
     if args.against:
         p = os.path.join(RESULTS, args.against + ".json")
         if os.path.exists(p):
-            prev = json.load(open(p))["metrics"]
+            with open(p) as fh:
+                prev = json.load(fh)["metrics"]
         else:
             print(f"warn: no snapshot {args.against!r}", file=sys.stderr)
 
@@ -132,15 +133,23 @@ def main():
 
     if unlabeled:
         print(f"\nUNLABELED (not scored): {', '.join(unlabeled)}")
-        print("Add relevant message ids to eval/gold.jsonl -- unlabeled queries "
-              "measure nothing.")
+        print(
+            "Add relevant message ids to eval/gold.jsonl -- unlabeled queries "
+            "measure nothing."
+        )
 
     if args.save:
         os.makedirs(RESULTS, exist_ok=True)
         with open(os.path.join(RESULTS, args.save + ".json"), "w") as f:
-            json.dump({"retriever": args.retriever, "metrics": agg,
-                       "by_type": {t: a for t, (_, a) in by_type(scored).items()}},
-                      f, indent=2)
+            json.dump(
+                {
+                    "retriever": args.retriever,
+                    "metrics": agg,
+                    "by_type": {t: a for t, (_, a) in by_type(scored).items()},
+                },
+                f,
+                indent=2,
+            )
         print(f"\nsaved snapshot: {args.save}")
 
     # Non-zero exit when nothing is measurable, so agents cannot claim success.
