@@ -1,5 +1,0 @@
-{"id": "q1", "query": "the wifi password someone sent me", "type": "exact", "relevant": [], "note": "SEED - fill `relevant` with real message ids via eval/label.py"}
-{"id": "q2", "query": "restaurant recommendation in new york", "type": "topical", "relevant": [], "note": "SEED"}
-{"id": "q3", "query": "when we agreed to split the rent", "type": "semantic", "relevant": [], "note": "SEED"}
-{"id": "q4", "query": "someone's new address after they moved", "type": "semantic", "relevant": [], "note": "SEED"}
-{"id": "q5", "query": "a flight confirmation number", "type": "exact", "relevant": [], "note": "SEED"}

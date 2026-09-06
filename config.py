@@ -56,9 +56,9 @@ PASSAGE_STRIDE = 1
 
 # --- models ------------------------------------------------------------------
 
-# embeddinggemma-300m is a gated HuggingFace repo and 401s without an access
-# token, so it cannot be the default. Override once you have accepted its terms.
-EMBED_MODEL = os.environ.get("MSGSEARCH_EMBED_MODEL", "BAAI/bge-small-en-v1.5")
+# Gated on HuggingFace: accept the model terms and `hf auth login` once, or this
+# 401s. Must match the model the index was built with -- search.py checks.
+EMBED_MODEL = os.environ.get("MSGSEARCH_EMBED_MODEL", "google/embeddinggemma-300m")
 RERANK_MODEL = os.environ.get("MSGSEARCH_RERANK_MODEL", "BAAI/bge-reranker-v2-m3")
 
 # --- retrieval ---------------------------------------------------------------

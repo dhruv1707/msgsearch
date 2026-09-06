@@ -69,6 +69,32 @@ def open_index(index_dir: Path | None = None) -> tuple[sqlite3.Connection, np.nd
     return sqlite3.connect(f"file:{db_path}?mode=ro", uri=True), np.load(vec_path)
 
 
+def index_meta(db) -> dict[str, str]:
+    return {key: value for key, value in db.execute("SELECT key, value FROM meta")}
+
+
+def assert_model_matches(db, embedder) -> None:
+    """Refuse to query an index built by a different embedding model.
+
+    Two models' vectors are not comparable even when their dimensions agree, so
+    this would otherwise degrade silently: the search returns confident-looking
+    nonsense rather than failing. When the dimensions differ it crashes instead,
+    which is better but still baffling. Neither is acceptable given how long a
+    rebuild takes.
+    """
+    built_with = index_meta(db).get("embed_model")
+    if built_with and built_with != embedder.model_name:
+        raise SystemExit(
+            f"Index/model mismatch.\n"
+            f"  index was built with : {built_with}\n"
+            f"  you are querying with: {embedder.model_name}\n\n"
+            f"Vectors from different models are not comparable, so results would "
+            f"be meaningless. Either point at the model the index was built with:\n\n"
+            f"  MSGSEARCH_EMBED_MODEL={built_with}\n\n"
+            f"or rebuild the index with the current model: python index.py"
+        )
+
+
 def _fts_expression(query: str) -> str:
     """Turn free text into an FTS5 expression.
 
@@ -288,6 +314,7 @@ def search(query: str, args, db=None, vectors=None, embedder=None, reranker=None
             from embedder import Embedder
 
             embedder = Embedder()
+        assert_model_matches(db, embedder)
         dense, best_passages = dense_candidates(
             db, vectors, embedder.embed_query(query), args, config.DENSE_CANDIDATES
         )
