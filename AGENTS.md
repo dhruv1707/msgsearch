@@ -36,10 +36,13 @@ Intel build and cannot install torch.
 ./.venv/bin/python search.py "atria login"       # query it
 ./.venv/bin/python -m unittest discover -s tests
 
-# not yet built:
-#   eval/bench.py --against baseline
-#   eval/label.py "a query"
+./.venv/bin/python eval/label.py "a query"       # add a labeled gold query
+./.venv/bin/python eval/bench.py -r eval.retriever --against baseline
 ```
+
+Retriever variants for `-r`, to score one stage at a time:
+`eval.retriever` (full) · `eval.retriever_bm25` · `eval.retriever_dense` ·
+`eval.retriever_norerank`
 
 ## The verification loop
 
