@@ -156,6 +156,63 @@ def _run_search(args) -> int:
     return 0
 
 
+def _add_login_command(subparsers) -> None:
+    parser = subparsers.add_parser(
+        "login",
+        help="authenticate with HuggingFace to download the embedding model",
+        description="The default embedding model is gated, so it needs a "
+        "HuggingFace account that has accepted its licence. This wraps the same "
+        "login the huggingface_hub library provides -- msgsearch owns the "
+        "command because installing msgsearch does not put `hf` on your PATH.",
+    )
+    parser.add_argument(
+        "--token",
+        metavar="TOKEN",
+        help="read token from https://huggingface.co/settings/tokens "
+        "(prompted for if omitted)",
+    )
+    parser.set_defaults(handler=_run_login)
+
+
+def _run_login(args) -> int:
+    from getpass import getpass
+
+    from huggingface_hub import login
+
+    from . import config
+
+    token = args.token
+    if not token:
+        print(f"A read token is needed to download {config.EMBED_MODEL}.")
+        print("Create one at https://huggingface.co/settings/tokens")
+        print(f"and accept the licence at https://huggingface.co/{config.EMBED_MODEL}")
+        try:
+            token = getpass("\nToken (input hidden): ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            return 130
+    if not token:
+        print("No token given.", file=sys.stderr)
+        return 1
+
+    try:
+        login(token=token)
+    except Exception as error:
+        print(f"Login failed: {error}", file=sys.stderr)
+        return 1
+
+    # Logging in successfully is not the same as having access to a gated model,
+    # and that difference is exactly what produces a baffling 401 later.
+    from .doctor import check_model
+
+    result = check_model()
+    print(f"\nlogged in. model: {result.detail}")
+    if result.fix:
+        print(result.fix)
+        return 1
+    return 0
+
+
 def _add_contacts_command(subparsers) -> None:
     parser = subparsers.add_parser(
         "contacts",
@@ -325,6 +382,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_doctor_command(subparsers)
     _add_explore_command(subparsers)
     _add_index_command(subparsers)
+    _add_login_command(subparsers)
     _add_search_command(subparsers)
     _add_sync_command(subparsers)
     return parser

@@ -23,9 +23,8 @@ what lands on your disk is unencrypted.
 # 1. install  (needs an arm64 Python — see Install if this errors)
 pipx install msgsearch
 
-# 2. get the embedding model
-#    accept the licence at huggingface.co/google/embeddinggemma-300m, then:
-hf auth login
+# 2. get the embedding model  (accept the licence in a browser first, then:)
+msgsearch login
 
 # 3. snapshot your messages            [needs Full Disk Access]
 msgsearch sync
@@ -47,12 +46,21 @@ so it takes seconds:
 msgsearch sync --index
 ```
 
-**Two permissions, and they are different.** `sync` needs **Full Disk Access** to
-read `~/Library/Messages`. Resolving names needs **Contacts**. macOS grants both
-to the *application*, not the shell, so if you run from an editor's integrated
-terminal the grant has to go to the editor — Terminal.app is the simple option.
-Both live in System Settings → Privacy & Security, and you must restart the app
-afterwards.
+### Granting Full Disk Access
+
+Step 3 fails without it. macOS grants this to the **application**, not to your
+shell, so the grant goes to whatever program you type commands into.
+
+1. Open **System Settings → Privacy & Security → Full Disk Access**
+2. Click **+**
+3. Press **⌘⇧G** and paste `/Applications/Utilities/Terminal.app`, then Open
+   (if you use iTerm, VS Code or another terminal, choose that instead)
+4. Make sure its toggle is **on**
+5. **Quit and reopen that application** — the permission is only read at launch
+
+Resolving contact names needs a *separate* permission, **Contacts**, granted the
+same way in the same place. It is optional; without it speakers appear as phone
+numbers. Full Disk Access does not include it.
 
 ## Requirements
 
@@ -114,12 +122,15 @@ arch -arm64 python3 -m venv .venv          # must be an arm64 interpreter
 
 ## Setup
 
-Get access to the embedding model. `google/embeddinggemma-300m` is gated, so
-accept the licence at <https://huggingface.co/google/embeddinggemma-300m>, then:
+Get access to the embedding model. `google/embeddinggemma-300m` is gated, so:
 
-```bash
-hf auth login
-```
+1. Accept the licence at <https://huggingface.co/google/embeddinggemma-300m>
+2. Create a read token at <https://huggingface.co/settings/tokens>
+3. Run `msgsearch login` and paste it
+
+`msgsearch login` checks afterwards that you can actually reach the model, since
+being logged in and having accepted the licence are different things — and the
+failure for the second looks identical to the first.
 
 Any sentence-transformers model works instead, for example
 `MSGSEARCH_EMBED_MODEL=BAAI/bge-small-en-v1.5`.
@@ -147,7 +158,7 @@ accept the Gemma licence at
 <https://huggingface.co/google/embeddinggemma-300m> and authenticate:
 
 ```bash
-./.venv/bin/hf auth login
+./.venv/bin/msgsearch login
 ```
 
 Any sentence-transformers model works instead if you would rather not, for example

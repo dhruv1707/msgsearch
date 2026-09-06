@@ -124,7 +124,7 @@ def check_model() -> Check:
                 FAIL,
                 f"{name} is gated and this machine is not authorised",
                 f"Accept the licence at https://huggingface.co/{name}, then run "
-                "'hf auth login'. An expired token gives this same error, so log in "
+                "'msgsearch login'. An expired token gives this same error, so log in "
                 "again even if you have before. Or set "
                 "MSGSEARCH_EMBED_MODEL=BAAI/bge-small-en-v1.5 to use an ungated model.",
             )

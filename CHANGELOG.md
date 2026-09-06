@@ -3,6 +3,22 @@
 Notable changes to msgsearch. Retrieval changes carry the measurement that
 justified them; see `ARCHITECTURE.md` for the full evaluation.
 
+## [0.2.2] — 2026-09-06
+
+### Added
+- `msgsearch login`, which authenticates with HuggingFace. The instructions
+  previously said to run `hf auth login`, but installing msgsearch does not put
+  `hf` on your PATH -- pipx exposes only the entry points a package declares, so
+  that step failed with "command not found" for everyone who installed normally.
+  It also verifies afterwards that the gated model is actually reachable, since
+  being logged in and having accepted the model licence are different things
+  whose failures look identical.
+
+### Changed
+- Full Disk Access instructions are now step by step, including that macOS grants
+  it to the application rather than the shell and that the application must be
+  restarted before it takes effect.
+
 ## [0.2.1] — 2026-09-06
 
 Documentation only. PyPI freezes a project's description at publish time, so

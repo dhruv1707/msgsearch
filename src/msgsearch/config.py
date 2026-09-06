@@ -76,7 +76,7 @@ PASSAGE_STRIDE = 1
 
 # --- models ------------------------------------------------------------------
 
-# Gated on HuggingFace: accept the model terms and `hf auth login` once, or this
+# Gated on HuggingFace: accept the model terms and run `msgsearch login` once,
 # 401s. Must match the model the index was built with -- search.py checks.
 EMBED_MODEL = os.environ.get("MSGSEARCH_EMBED_MODEL", "google/embeddinggemma-300m")
 

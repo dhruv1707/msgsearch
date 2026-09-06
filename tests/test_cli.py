@@ -75,3 +75,26 @@ class TestEntryPoint(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestLoginCommand(unittest.TestCase):
+    """Authentication is a msgsearch command because `hf` is not on the PATH.
+
+    Installing msgsearch exposes only the entry points msgsearch declares, so
+    telling people to run `hf auth login` failed with "command not found" for
+    everyone who installed it normally rather than from a checkout.
+    """
+
+    def setUp(self):
+        self.parser = cli.build_parser()
+
+    def test_login_is_a_command(self):
+        args = self.parser.parse_args(["login"])
+        self.assertTrue(callable(args.handler))
+
+    def test_token_can_be_passed_non_interactively(self):
+        args = self.parser.parse_args(["login", "--token", "hf_example"])
+        self.assertEqual(args.token, "hf_example")
+
+    def test_token_is_optional_so_it_can_prompt(self):
+        self.assertIsNone(self.parser.parse_args(["login"]).token)

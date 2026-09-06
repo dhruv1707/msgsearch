@@ -37,7 +37,7 @@ def _load_failure_hint(model_name: str, error: Exception) -> str:
         f"is not authorised.\n\n"
         f"  1. Accept the licence at https://huggingface.co/{model_name}\n"
         f"  2. Create a read token at https://huggingface.co/settings/tokens\n"
-        f"  3. Run: hf auth login\n\n"
+        f"  3. Run: msgsearch login\n\n"
         f"Note that an *expired* token produces this same error, so re-run step 3 "
         f"even if you have logged in before. To use an ungated model instead:\n\n"
         f"  MSGSEARCH_EMBED_MODEL=BAAI/bge-small-en-v1.5\n\n"

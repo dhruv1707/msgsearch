@@ -125,7 +125,7 @@ Both run locally on Metal via MPS.
 
 | role | model | notes |
 |---|---|---|
-| embedding | `google/embeddinggemma-300m` | 768-dim. **Gated** — needs Gemma licence acceptance and `hf auth login`. Matryoshka truncation to 512/256/128 available if the array grows. |
+| embedding | `google/embeddinggemma-300m` | 768-dim. **Gated** — needs Gemma licence acceptance and `msgsearch login`. Matryoshka truncation to 512/256/128 available if the array grows. |
 | rerank | `Qwen/Qwen3-Reranker-0.6B` | matches qmd's choice |
 
 Rerankers measured over 50 candidates on the one query available:
