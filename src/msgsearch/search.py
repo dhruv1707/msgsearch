@@ -62,7 +62,7 @@ def open_index(index_dir: Path | None = None) -> tuple[sqlite3.Connection, np.nd
     vec_path = index_dir / "vectors.npy"
     if not db_path.exists() or not vec_path.exists():
         raise FileNotFoundError(
-            f"No index in {index_dir}. Build one first with: python index.py"
+            f"No index in {index_dir}. Build one first with: msgsearch index"
         )
     # Loaded into memory rather than memory-mapped. Mapping it looks like an
     # obvious win at ~677 MB for the full corpus, but it was measured and it is
@@ -95,7 +95,7 @@ def assert_model_matches(db, embedder) -> None:
             f"Vectors from different models are not comparable, so results would "
             f"be meaningless. Either point at the model the index was built with:\n\n"
             f"  MSGSEARCH_EMBED_MODEL={built_with}\n\n"
-            f"or rebuild the index with the current model: python index.py"
+            f"or rebuild the index with the current model: msgsearch index"
         )
 
 
