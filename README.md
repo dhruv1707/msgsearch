@@ -25,14 +25,23 @@ what lands on your disk is unencrypted.
   `python3 -c "import platform; print(platform.machine())"` — it must say `arm64`.
 - About 3 GB of disk for dependencies and model weights.
 
-## Setup
+## Install
 
 ```bash
-python3 -m venv .venv                  # must be an arm64 interpreter
-./.venv/bin/python -m pip install -e .
+uvx msgsearch doctor          # run it without installing anything
+pipx install msgsearch        # or install the command globally
 ```
 
-This installs a `msgsearch` command into the virtualenv.
+Either pulls PyTorch, which is around 1 GB, so the first run is slow. Everything
+after that is local and fast.
+
+To work on it instead, clone and install in place:
+
+```bash
+git clone https://github.com/dhruv1707/msgsearch && cd msgsearch
+python3 -m venv .venv                  # must be an arm64 interpreter
+./.venv/bin/python -m pip install -e ".[dev]"
+```
 
 Copy the Messages database. **Never point this tool at `~/Library/Messages`**:
 that file is live, Messages.app holds locks on it, and it is irreplaceable.
