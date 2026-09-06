@@ -1,0 +1,8 @@
+{"id": "q1", "query": "atria login", "type": "semantic", "relevant": ["646:255921"]}
+{"id": "q2", "query": "Austin address", "type": "semantic", "relevant": ["646:288302"]}
+{"id": "q3", "query": "Higgsfield login", "type": "semantic", "relevant": ["646:301077"]}
+{"id": "q4", "query": "gemini api key", "type": "semantic", "relevant": ["646:302522"]}
+{"id": "q5", "query": "new offer", "type": "topical", "relevant": ["646:302853", "646:303305", "646:285325", "646:303090", "646:302473", "646:302597", "646:297485", "646:297205"]}
+{"id": "q6", "query": "husband and wife ad concept", "type": "topical", "relevant": ["646:303493", "646:303433", "646:303550", "646:297094"]}
+{"id": "q7", "query": "rest ad concepts", "type": "topical", "relevant": ["646:299039"]}
+{"id": "q8", "query": "new hugl pdp", "type": "semantic", "relevant": ["646:300029"]}

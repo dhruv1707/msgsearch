@@ -59,7 +59,19 @@ PASSAGE_STRIDE = 1
 # Gated on HuggingFace: accept the model terms and `hf auth login` once, or this
 # 401s. Must match the model the index was built with -- search.py checks.
 EMBED_MODEL = os.environ.get("MSGSEARCH_EMBED_MODEL", "google/embeddinggemma-300m")
-RERANK_MODEL = os.environ.get("MSGSEARCH_RERANK_MODEL", "BAAI/bge-reranker-v2-m3")
+
+# Reranking is OFF by default because it measurably hurts. Over the 8-query gold
+# set it drops MRR from 0.823 to 0.700, and on topical queries from 1.000 to
+# 0.700: the cross-encoder takes rankings fusion got right and scrambles them.
+# These rerankers are trained on clean QA passages, and a window of "Yaaa bro I
+# do" is far outside that distribution. It is also slow -- measured over 50
+# candidates, Qwen3-Reranker takes 4.2s against 1.1s for bge-reranker-v2-m3 and
+# 0.15s for ms-marco-MiniLM.
+#
+# Re-test it whenever chunking, the embedding model or the gold set changes:
+#   MSGSEARCH_RERANK=1 .venv/bin/python eval/bench.py -r eval.retriever
+RERANK_ENABLED = os.environ.get("MSGSEARCH_RERANK", "0") == "1"
+RERANK_MODEL = os.environ.get("MSGSEARCH_RERANK_MODEL", "Qwen/Qwen3-Reranker-0.6B")
 
 # --- retrieval ---------------------------------------------------------------
 

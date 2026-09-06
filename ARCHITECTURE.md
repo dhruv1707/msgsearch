@@ -123,7 +123,27 @@ Both run locally on Metal via MPS.
 | role | model | notes |
 |---|---|---|
 | embedding | `google/embeddinggemma-300m` | 768-dim. **Gated** — needs Gemma licence acceptance and `hf auth login`. Matryoshka truncation to 512/256/128 available if the array grows. |
-| rerank | `BAAI/bge-reranker-v2-m3` | cheap at ~50 candidates |
+| rerank | `Qwen/Qwen3-Reranker-0.6B` | matches qmd's choice |
+
+Rerankers measured over 50 candidates on the one query available:
+
+| model | load | score 50 | on disk | rank produced |
+|---|---|---|---|---|
+| `cross-encoder/ms-marco-MiniLM-L-6-v2` | 1.8s | 0.15s | 88 MB | 2 |
+| `BAAI/bge-reranker-v2-m3` | 5.0s | 1.12s | 2.1 GB | 2 |
+| `Qwen/Qwen3-Reranker-0.6B` | 2.6s | 4.21s | 1.1 GB | 2 |
+
+Qwen3-Reranker is a causal LM scoring relevance from `yes`/`no` logits rather than
+a classification head, which is why it is ~28× slower than MiniLM. It loads
+through `CrossEncoder` and applies its own `query` prompt automatically; sanity
+checks on obvious relevant/irrelevant pairs order correctly with a wide margin.
+
+**All three produce the same ranking, and so does skipping the stage entirely.**
+On the single query evaluated, RRF fusion already places the target at rank 2 and
+no reranker moves it. This is not evidence the stage is worthless — reranking
+earns its keep on ambiguous queries, and n=1 settles nothing — but it is currently
+4.2s of latency per search with no measured benefit. First thing to test once
+`gold.jsonl` has labels.
 
 **EmbeddingGemma requires task-specific prompt prefixes.** Queries and documents
 are presented to it differently, and that asymmetry is what teaches it to place a

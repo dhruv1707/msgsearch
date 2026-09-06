@@ -1,5 +1,5 @@
 {
-  "retriever": "eval.retriever",
+  "retriever": "eval.retriever_norerank",
   "metrics": {
     "p@10": 0.1625,
     "r@50": 1.0,

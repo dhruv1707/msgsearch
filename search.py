@@ -343,7 +343,7 @@ def search(query: str, args, db=None, vectors=None, embedder=None, reranker=None
     if ordered:
         _fill_missing_passages(db, ordered, query)
 
-    if not args.no_rerank and ordered:
+    if config.RERANK_ENABLED and not args.no_rerank and ordered:
         if reranker is None:
             from embedder import Reranker
 
