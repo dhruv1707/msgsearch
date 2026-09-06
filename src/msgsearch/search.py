@@ -25,18 +25,16 @@ that gets shown.
 
 from __future__ import annotations
 
-import argparse
 import json
 import re
 import sqlite3
-import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
 
-import config
+from . import config
 
 
 @dataclass
@@ -66,6 +64,12 @@ def open_index(index_dir: Path | None = None) -> tuple[sqlite3.Connection, np.nd
         raise FileNotFoundError(
             f"No index in {index_dir}. Build one first with: python index.py"
         )
+    # Loaded into memory rather than memory-mapped. Mapping it looks like an
+    # obvious win at ~677 MB for the full corpus, but it was measured and it is
+    # not: BLAS takes a different code path for a memmap and returns results that
+    # differ by ~2e-08, which is enough to flip near-ties in the ranking. That
+    # cost 0.027 MRR on the gold set, all of it from one topical query dropping
+    # from rank 1 to rank 2. Do not re-apply this without re-running eval/bench.py.
     return sqlite3.connect(f"file:{db_path}?mode=ro", uri=True), np.load(vec_path)
 
 
@@ -96,15 +100,41 @@ def assert_model_matches(db, embedder) -> None:
 
 
 def _fts_expression(query: str) -> str:
-    """Turn free text into an FTS5 expression.
+    """Turn free text into an FTS5 expression that prefers complete matches.
 
     User input cannot be handed to FTS5 directly, because characters such as
     quotes and hyphens are operators there and would either raise an error or
-    silently change the query. Each word is extracted and quoted, then combined
-    with OR so a partial match still retrieves something.
+    silently change the query. Every word is therefore extracted and quoted.
+
+    How they are combined matters a lot. Plain OR treats a window containing only
+    "login" as eligible for "atria login", which on a whole-archive index floods
+    the results with every unrelated conversation that mentions logging in. Plain
+    AND is worse: it is stricter than people expect and loses answers outright
+    (measured at MRR 0.630 against 0.673 for OR).
+
+    So the expression is layered — the exact phrase, then all terms, then any
+    term, OR-ed together. Every window that OR would have found is still found,
+    but windows matching more layers accumulate more term hits and BM25 ranks
+    them higher. It is a preference rather than a filter, which is why recall
+    goes up rather than down.
+
+    Measured on the gold set: MRR 0.673 -> 0.782, recall@50 0.972 -> 1.000, with
+    no query ranking worse than before.
     """
     terms = re.findall(r"\w+", query.lower())
-    return " OR ".join(f'"{term}"' for term in terms)
+    if not terms:
+        return ""
+
+    quoted = [f'"{term}"' for term in terms]
+    if len(terms) == 1:
+        return quoted[0]
+
+    layers = [
+        '"' + " ".join(terms) + '"',  # the phrase, in order
+        " AND ".join(quoted),  # all the words, any order
+        " OR ".join(quoted),  # any word at all
+    ]
+    return " OR ".join(f"({layer})" for layer in layers)
 
 
 def _filter_clause(args) -> tuple[str, list]:
@@ -142,6 +172,22 @@ def _allowed_windows(db, args) -> set[int] | None:
     }
 
 
+def _allowed_passages(db, args) -> list[int] | None:
+    """Vector rows eligible under the current filters, or None if unfiltered."""
+    where, params = _filter_clause(args)
+    if not where:
+        return None
+    return [
+        row[0]
+        for row in db.execute(
+            f"""SELECT p.vector_row FROM passages p
+                JOIN windows w ON w.window_row = p.window_row
+                WHERE 1=1 {where}""",
+            params,
+        )
+    ]
+
+
 def bm25_candidates(db, query: str, args, limit: int) -> list[int]:
     expression = _fts_expression(query)
     if not expression:
@@ -168,7 +214,20 @@ def dense_candidates(
     and so the reranker is later shown the strongest slice of each candidate.
     """
     scores = vectors @ query_vector
-    allowed = _allowed_windows(db, args)
+
+    # Filters are applied to the scores *before* the shortlist is taken. Doing it
+    # afterwards silently destroys recall: on a large index the top few hundred
+    # passages are dominated by whichever conversations happen to score well, so
+    # a filtered search would discard nearly all of them and return almost
+    # nothing. The filter has to decide what is eligible, not what survives.
+    allowed_passages = _allowed_passages(db, args)
+    if allowed_passages is not None:
+        mask = np.zeros(len(scores), dtype=bool)
+        rows = [r for r in allowed_passages if 0 <= r < len(scores)]
+        if not rows:
+            return [], {}
+        mask[rows] = True
+        scores = np.where(mask, scores, -np.inf)
 
     # Passages outnumber windows several times over, so scan deeper than the
     # window limit before collapsing.
@@ -193,8 +252,6 @@ def dense_candidates(
         if entry is None:
             continue
         window_row, text, rowids = entry
-        if allowed is not None and window_row not in allowed:
-            continue
         if window_row in best:
             continue
         best[window_row] = (text, json.loads(rowids))
@@ -305,13 +362,15 @@ def search(query: str, args, db=None, vectors=None, embedder=None, reranker=None
     if db is None or vectors is None:
         db, vectors = open_index(args.index_dir)
 
-    bm25 = [] if args.no_bm25 else bm25_candidates(db, query, args, config.BM25_CANDIDATES)
+    bm25 = (
+        [] if args.no_bm25 else bm25_candidates(db, query, args, config.BM25_CANDIDATES)
+    )
 
     dense: list[int] = []
     best_passages: dict[int, tuple[str, list[int]]] = {}
     if not args.no_dense:
         if embedder is None:
-            from embedder import Embedder
+            from .embedder import Embedder
 
             embedder = Embedder()
         assert_model_matches(db, embedder)
@@ -345,11 +404,11 @@ def search(query: str, args, db=None, vectors=None, embedder=None, reranker=None
 
     if config.RERANK_ENABLED and not args.no_rerank and ordered:
         if reranker is None:
-            from embedder import Reranker
+            from .embedder import Reranker
 
             reranker = Reranker()
         scores = reranker.score(query, [r.passage_text for r in ordered])
-        for result, score in zip(ordered, scores):
+        for result, score in zip(ordered, scores, strict=True):
             result.rerank_score = float(score)
         ordered.sort(key=lambda r: r.rerank_score, reverse=True)
 
@@ -386,41 +445,3 @@ def format_result(
         f"({who}){tags}\n"
         f"   {' · '.join(ranks)}\n{body}"
     )
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Search your messages by meaning.")
-    parser.add_argument("query", nargs="+", help="what you are looking for")
-    parser.add_argument("--limit", type=int, default=config.DEFAULT_LIMIT)
-    parser.add_argument("--chat", help="restrict to conversations matching this text")
-    parser.add_argument("--from", dest="from_", help="restrict to a speaker")
-    parser.add_argument("--after", help="YYYY-MM-DD")
-    parser.add_argument("--before", help="YYYY-MM-DD")
-    parser.add_argument("--type", help="shape tag: credential, email, phone, url, address")
-    parser.add_argument("--index-dir", default=None)
-    parser.add_argument("--snippet", type=int, default=1200, help="max characters shown")
-    parser.add_argument(
-        "--full", action="store_true", help="show the whole window, not just the match"
-    )
-    parser.add_argument("--no-rerank", action="store_true", help="skip the cross-encoder")
-    parser.add_argument("--no-dense", action="store_true", help="keyword search only")
-    parser.add_argument("--no-bm25", action="store_true", help="vector search only")
-    args = parser.parse_args()
-
-    query = " ".join(args.query)
-    try:
-        results = search(query, args)
-    except FileNotFoundError as error:
-        sys.exit(str(error))
-
-    if not results:
-        print("no results")
-        return
-
-    print(f"{len(results)} result(s) for {query!r}")
-    for i, result in enumerate(results, start=1):
-        print(format_result(i, result, args.snippet, full=args.full))
-
-
-if __name__ == "__main__":
-    main()
