@@ -1,19 +1,21 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python3 explore.py)",
-      "Bash(python3 eval/bench.py:*)",
-      "Bash(python3 search/index.py:*)",
-      "Bash(python3 -c:*)",
-      "Bash(git status:*)",
+      "Bash(./.venv/bin/python:*)",
+      "Bash(git add:*)",
+      "Bash(git checkout:*)",
+      "Bash(git commit:*)",
       "Bash(git diff:*)",
       "Bash(git log:*)",
-      "Bash(git add:*)",
-      "Bash(git commit:*)",
-      "Read(./**)",
-      "Edit(./search/**)",
+      "Bash(git status:*)",
+      "Bash(python3 -c:*)",
+      "Bash(python3 eval/bench.py:*)",
+      "Bash(python3 explore.py)",
+      "Bash(python3 search/index.py:*)",
+      "Edit(./AGENTS.md)",
       "Edit(./eval/**)",
-      "Edit(./AGENTS.md)"
+      "Edit(./search/**)",
+      "Read(./**)"
     ],
     "deny": [
       "Read(~/Library/Messages/**)",
@@ -29,6 +31,19 @@
           {
             "type": "command",
             "command": "python3 -c \"import ast,sys,glob; [ast.parse(open(f).read(),f) for f in glob.glob('**/*.py',recursive=True) if '.venv' not in f]\" || true"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.venv/bin/python ${CLAUDE_PROJECT_DIR}/.claude/hooks/verify-retrieval.py",
+            "timeout": 600,
+            "statusMessage": "checking retrieval didn't regress"
           }
         ]
       }
