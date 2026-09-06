@@ -19,43 +19,73 @@ what lands on your disk is unencrypted.
 
 ## Requirements
 
-- macOS with an **arm64** Python 3.10 or newer. PyTorch stopped publishing
-  x86_64 macOS wheels, so an Intel-built interpreter cannot install torch and
-  cannot use the GPU — and Homebrew's `/usr/local` Python is an Intel build even
-  on Apple silicon. Check with:
-
-  ```bash
-  python3 -c "import platform; print(platform.machine())"   # must say arm64
-  ```
-
-  If it says `x86_64`, point the installer at an arm64 interpreter explicitly:
-
-  ```bash
-  pipx install --python /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 msgsearch
-  ```
-
-  Architecture is not something package metadata can express, so this fails at
-  dependency resolution rather than with a helpful message. `msgsearch doctor`
-  checks it.
+- **macOS on Apple silicon.** PyTorch no longer publishes x86_64 macOS wheels.
+- **Python 3.10 or newer, running as arm64.** See the note below — this is the
+  one thing that reliably goes wrong.
 - About 3 GB of disk for dependencies and model weights.
 
 ## Install
 
 ```bash
-uvx msgsearch doctor          # run it without installing anything
-pipx install msgsearch        # or install the command globally
+pipx install msgsearch
+msgsearch doctor
 ```
 
-Either pulls PyTorch, which is around 1 GB, so the first run is slow. Everything
-after that is local and fast.
+This pulls PyTorch, around 1 GB, so the first install is slow. Everything after
+that is local and fast.
 
-To work on it instead, clone and install in place:
+<details>
+<summary><b>If that fails with "No matching distribution found for torch"</b></summary>
+
+You have an Intel-built Python, which is common on Apple silicon after migrating
+from an Intel Mac. Check:
+
+```bash
+python3 -c "import platform; print(platform.machine())"   # must say arm64
+```
+
+The confusing part is that `pipx install --python /path/to/arm64/python` often
+**does not fix it**. Python from python.org is a *universal* binary that runs as
+whichever architecture its parent process is, and if pipx itself was installed by
+an Intel Homebrew (`/usr/local/...`), it launches that Python as x86_64. pip then
+looks for x86_64 wheels that PyTorch does not publish.
+
+Install into a venv created explicitly under arm64 instead:
+
+```bash
+arch -arm64 /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 \
+    -m venv ~/.msgsearch-venv
+~/.msgsearch-venv/bin/pip install msgsearch
+ln -sf ~/.msgsearch-venv/bin/msgsearch /usr/local/bin/msgsearch
+```
+
+Adjust the interpreter path to any arm64 Python 3.10+. To undo:
+`rm /usr/local/bin/msgsearch && rm -rf ~/.msgsearch-venv`.
+
+Architecture cannot be expressed in package metadata, which is why this surfaces
+as a dependency-resolution wall rather than a useful error. `msgsearch doctor`
+reports it in one line.
+</details>
+
+To work on msgsearch rather than use it:
 
 ```bash
 git clone https://github.com/dhruv1707/msgsearch && cd msgsearch
-python3 -m venv .venv                  # must be an arm64 interpreter
+arch -arm64 python3 -m venv .venv          # must be an arm64 interpreter
 ./.venv/bin/python -m pip install -e ".[dev]"
 ```
+
+## Setup
+
+Get access to the embedding model. `google/embeddinggemma-300m` is gated, so
+accept the licence at <https://huggingface.co/google/embeddinggemma-300m>, then:
+
+```bash
+hf auth login
+```
+
+Any sentence-transformers model works instead, for example
+`MSGSEARCH_EMBED_MODEL=BAAI/bge-small-en-v1.5`.
 
 Take a snapshot of the Messages database. **Never point this tool at
 `~/Library/Messages`**: that file is live, Messages.app holds locks on it, and it
