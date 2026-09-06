@@ -43,18 +43,18 @@ TYPES = {
 
 
 def pool(query, per_retriever=15):
-    import importlib
-    seen, ordered = set(), []
-    for path in RETRIEVERS:
-        try:
-            mod = importlib.import_module(path)
-        except ImportError:
-            continue
-        for mid, _ in mod.search(query, per_retriever):
-            if mid not in seen:
-                seen.add(mid)
-                ordered.append(mid)
-    return ordered
+    """Union the top hits of each retrieval stage, keeping the text that matched."""
+    from eval import retriever
+    stages = [("bm25", dict(no_dense=True, no_rerank=True)),
+              ("dense", dict(no_bm25=True, no_rerank=True))]
+    seen, ordered, matched = set(), [], {}
+    for _, flags in stages:
+        for wid, text in retriever.search_detailed(query, per_retriever, **flags):
+            if wid not in seen:
+                seen.add(wid)
+                ordered.append(wid)
+                matched[wid] = text
+    return ordered, matched
 
 
 def bodies(ids):
@@ -91,7 +91,7 @@ def main():
         query = args.query
         gid = args.id or f"q{len(gold) + 1}"
 
-    ids = pool(query)
+    ids, matched = pool(query)
     if not ids:
         sys.exit("no candidates -- is index.sqlite built? (python3 search/index.py)")
     meta = bodies(ids)
@@ -101,16 +101,30 @@ def main():
         row = meta.get(wid)
         if not row:
             continue
-        _, ts, chat, n_msgs, tags, text = row
+        _, ts, chat, n_msgs, tags, _full = row
         tag = f"[{tags}]" if tags else ""
-        snippet = " ".join(text.split())[:120]
-        print(f"[{n:>2}] {wid:<14} {(ts or '')[:10]}  {(chat or '?')[:16]:<16} "
-              f"{n_msgs:>3}msg {tag}")
+        # Show the text from the matched message onward, not the window's head.
+        snippet = " ".join(matched.get(wid, "").split())[:170]
+        print(f"[{n:>2}] {wid:<14} {(ts or '')[:10]}  {n_msgs:>3}msg {tag}")
         print(f"     {snippet}")
 
     print("\nEnter the numbers whose conversation actually answers the query "
           "(e.g. 1 4 7), or blank for none.")
-    picks = input("> ").split()
+    print("Type ?N (e.g. ?7) to read a whole conversation first.")
+    while True:
+        raw = input("> ").strip()
+        if raw.startswith("?"):
+            want = raw[1:].strip()
+            if want.isdigit() and 1 <= int(want) <= len(ids):
+                wid = ids[int(want) - 1]
+                print(f"\n----- [{want}] {wid} -----")
+                print(meta[wid][5])
+                print("-" * (len(wid) + 16) + "\n")
+            else:
+                print(f"no candidate {want!r}")
+            continue
+        picks = raw.split()
+        break
     relevant = [ids[int(p) - 1] for p in picks if p.isdigit() and 1 <= int(p) <= len(ids)]
 
     print("\nWhat kind of query is this?")

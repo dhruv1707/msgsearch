@@ -51,6 +51,18 @@ def _pipeline():
     return _state
 
 
+def search_detailed(query, k=50, **overrides):
+    """Like search(), but also returns the window text starting at the message
+    that matched. The head of a 95-message window says nothing about why it was
+    retrieved, so the labeler shows this instead."""
+    p = _pipeline()
+    results = p["S"].search(
+        query, _args(k, **overrides),
+        db=p["db"], vectors=p["vectors"], embedder=p["embedder"],
+    )
+    return [(r.window_id, p["S"].anchored_text(r)) for r in results]
+
+
 def search(query, k=50, **overrides):
     p = _pipeline()
     results = p["S"].search(
