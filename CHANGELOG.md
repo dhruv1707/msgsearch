@@ -3,6 +3,13 @@
 Notable changes to msgsearch. Retrieval changes carry the measurement that
 justified them; see `ARCHITECTURE.md` for the full evaluation.
 
+## [0.2.3] — 2026-09-06
+
+### Fixed
+- Model-loading failures printed a Python traceback around their instructions,
+  which reads as a crash rather than "you need to log in" and buries the steps
+  under a stack. They now print the guidance alone and exit non-zero.
+
 ## [0.2.2] — 2026-09-06
 
 ### Added

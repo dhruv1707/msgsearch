@@ -398,6 +398,12 @@ def main(argv: list[str] | None = None) -> int:
         return args.handler(args)
     except KeyboardInterrupt:
         return 130
+    except RuntimeError as error:
+        # Model loading raises RuntimeError carrying instructions the user can
+        # act on. A traceback around them reads as "this crashed" rather than
+        # "you need to log in", and buries the steps under a stack.
+        print(error, file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":
