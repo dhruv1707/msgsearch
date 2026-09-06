@@ -19,10 +19,24 @@ what lands on your disk is unencrypted.
 
 ## Requirements
 
-- macOS with an **arm64** Python 3.12 or 3.13. PyTorch stopped publishing x86_64
-  macOS wheels, so an Intel-built interpreter (common at `/usr/local` even on
-  Apple Silicon) cannot install torch and cannot use the GPU. Check with
-  `python3 -c "import platform; print(platform.machine())"` — it must say `arm64`.
+- macOS with an **arm64** Python 3.10 or newer. PyTorch stopped publishing
+  x86_64 macOS wheels, so an Intel-built interpreter cannot install torch and
+  cannot use the GPU — and Homebrew's `/usr/local` Python is an Intel build even
+  on Apple silicon. Check with:
+
+  ```bash
+  python3 -c "import platform; print(platform.machine())"   # must say arm64
+  ```
+
+  If it says `x86_64`, point the installer at an arm64 interpreter explicitly:
+
+  ```bash
+  pipx install --python /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 msgsearch
+  ```
+
+  Architecture is not something package metadata can express, so this fails at
+  dependency resolution rather than with a helpful message. `msgsearch doctor`
+  checks it.
 - About 3 GB of disk for dependencies and model weights.
 
 ## Install

@@ -11,6 +11,11 @@ justified them; see `ARCHITECTURE.md` for the full evaluation.
   command.
 
 ### Fixed
+- `requires-python` excluded Python 3.14, so `pipx install msgsearch` failed with
+  "Could not find a version that satisfies the requirement" on any machine whose
+  default interpreter was 3.14. The bound was set on a misdiagnosis: PyTorch does
+  publish cp314 wheels, and the real constraint is Apple silicon, which package
+  metadata cannot express. CI now covers 3.14 so this cannot recur.
 - The documented `cp ~/Library/Messages/chat.db*` could silently lose recent
   messages. Messages runs SQLite in WAL mode, so the newest messages sit in a
   `chat.db-wal` sidecar until checkpointed; copying only the main file drops

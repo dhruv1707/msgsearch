@@ -8,7 +8,7 @@ version = "0.2.0"
 description = "Search your iMessage history by meaning, entirely on your own machine."
 readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = ">=3.10,<3.14"
+requires-python = ">=3.10"
 keywords = ["imessage", "search", "semantic-search", "local-first", "embeddings"]
 classifiers = [
     "Development Status :: 3 - Alpha",
