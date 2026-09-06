@@ -24,7 +24,7 @@ every private thing anyone has ever sent you.
 
 from __future__ import annotations
 
-import argparse
+import hashlib
 import json
 import sqlite3
 import time
@@ -32,10 +32,10 @@ from pathlib import Path
 
 import numpy as np
 
-import config
-from chunk import passages, windows
-from embedder import Embedder
-from extract import connect, iter_messages
+from . import config
+from .chunk import passages, windows
+from .embedder import Embedder
+from .extract import connect, iter_messages
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS windows (
@@ -62,10 +62,12 @@ CREATE TABLE IF NOT EXISTS passages (
     window_id   TEXT NOT NULL,
     window_row  INTEGER NOT NULL,
     text        TEXT NOT NULL,
+    text_hash   TEXT NOT NULL,
     rowids      TEXT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS passages_window ON passages(window_row);
+CREATE INDEX IF NOT EXISTS passages_hash ON passages(text_hash);
 
 -- An external-content table: FTS5 indexes the window text without copying it.
 CREATE VIRTUAL TABLE IF NOT EXISTS windows_fts USING fts5(
@@ -79,11 +81,65 @@ CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
 """
 
 
+def passage_hash(text: str) -> str:
+    """Content address for a passage, used to reuse its embedding across builds."""
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:32]
+
+
+def load_embedding_cache(
+    db_path: Path, vec_path: Path, model_name: str, dimension: int
+) -> dict[str, np.ndarray]:
+    """Map passage content hash to its embedding, from a previous build.
+
+    Reuse is keyed on the passage text rather than on message ids or dates, which
+    is what makes this correct in the awkward cases. New messages can *extend* the
+    last window of a conversation, changing which passages it yields; a passage
+    whose text is unchanged keeps its vector, and one whose text changed is
+    re-embedded, without either case needing to be detected explicitly. Changing
+    `PASSAGE_MESSAGES` likewise rewrites every passage text, so the cache misses
+    everywhere and the whole index is rebuilt, which is the correct behaviour.
+
+    An empty cache is returned whenever reuse would be unsound: no previous index,
+    a different embedding model, a different dimension, or an index predating this
+    scheme.
+    """
+    if not (db_path.exists() and vec_path.exists()):
+        return {}
+
+    db = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    try:
+        meta = dict(db.execute("SELECT key, value FROM meta"))
+        if meta.get("embed_model") != model_name:
+            return {}
+        if int(meta.get("dimension", 0)) != dimension:
+            return {}
+        try:
+            rows = db.execute("SELECT text_hash, vector_row FROM passages").fetchall()
+        except sqlite3.OperationalError:
+            return {}  # index built before passages carried a hash
+    finally:
+        db.close()
+
+    vectors = np.load(vec_path)
+    return {
+        text_hash: vectors[row]
+        for text_hash, row in rows
+        if text_hash and 0 <= row < len(vectors)
+    }
+
+
 def build(
     chat_identifier: str | None = None,
     index_dir: Path | None = None,
     batch_size: int = 32,
+    rebuild: bool = False,
 ) -> Path:
+    """Build the index, reusing embeddings from a previous build where possible.
+
+    Windows and passages are always recomputed, which is cheap. Embedding is the
+    expensive step, so passages whose text is unchanged keep the vector they had.
+    Pass `rebuild=True` to embed everything from scratch.
+    """
     index_dir = Path(index_dir or config.INDEX_DIR).expanduser()
     index_dir.mkdir(parents=True, exist_ok=True)
     db_path = index_dir / "index.db"
@@ -121,10 +177,43 @@ def build(
         flush=True,
     )
 
-    print(f"embedding {len(all_passages):,} passages...", flush=True)
-    vectors = embedder.embed_documents(
-        [p.text for p in all_passages], batch_size=batch_size, show_progress=True
+    hashes = [passage_hash(p.text) for p in all_passages]
+    cache = (
+        {}
+        if rebuild
+        else load_embedding_cache(
+            db_path, vec_path, embedder.model_name, embedder.dimension
+        )
     )
+
+    vectors = np.zeros((len(all_passages), embedder.dimension), dtype=np.float32)
+    missing = []
+    for row, text_hash in enumerate(hashes):
+        cached = cache.get(text_hash)
+        if cached is None:
+            missing.append(row)
+        else:
+            vectors[row] = cached
+
+    reused = len(all_passages) - len(missing)
+    if cache:
+        print(
+            f"  reusing {reused:,} embeddings from the previous index "
+            f"({100 * reused / max(len(all_passages), 1):.1f}%)",
+            flush=True,
+        )
+
+    if missing:
+        print(f"embedding {len(missing):,} new or changed passages...", flush=True)
+        fresh = embedder.embed_documents(
+            [all_passages[row].text for row in missing],
+            batch_size=batch_size,
+            show_progress=True,
+        )
+        for row, vector in zip(missing, fresh, strict=True):
+            vectors[row] = vector
+    else:
+        print("  nothing new to embed", flush=True)
 
     print("writing index...", flush=True)
     if db_path.exists():
@@ -158,8 +247,8 @@ def build(
 
     db.executemany(
         """INSERT INTO passages (vector_row, passage_id, window_id, window_row,
-                                 text, rowids)
-           VALUES (?,?,?,?,?,?)""",
+                                 text, text_hash, rowids)
+           VALUES (?,?,?,?,?,?,?)""",
         [
             (
                 row,
@@ -167,6 +256,7 @@ def build(
                 p.window_id,
                 window_rows[p.window_id],
                 p.text,
+                hashes[row],
                 json.dumps(list(p.rowids)),
             )
             for row, p in enumerate(all_passages)
@@ -187,6 +277,8 @@ def build(
             ("token_budget", str(config.WINDOW_TOKEN_BUDGET)),
             ("passage_messages", str(config.PASSAGE_MESSAGES)),
             ("passage_stride", str(config.PASSAGE_STRIDE)),
+            ("embeddings_reused", str(reused)),
+            ("embeddings_computed", str(len(missing))),
             ("built_at", time.strftime("%Y-%m-%dT%H:%M:%S")),
             ("chat_filter", chat_identifier or ""),
         ],
@@ -199,30 +291,8 @@ def build(
     elapsed = time.time() - started
     print(
         f"done in {elapsed:.0f}s: {len(all_windows):,} windows, "
-        f"{len(all_passages):,} passages, vectors {vectors.shape}",
+        f"{len(all_passages):,} passages "
+        f"({reused:,} reused, {len(missing):,} embedded), vectors {vectors.shape}",
         flush=True,
     )
     return index_dir
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Build the msgsearch index.")
-    parser.add_argument(
-        "--chat",
-        default=config.TESTBED_CHAT,
-        help="Restrict to one conversation (phone number or email). "
-        "Defaults to MSGSEARCH_TESTBED_CHAT.",
-    )
-    parser.add_argument("--index-dir", default=None)
-    parser.add_argument("--batch-size", type=int, default=32)
-    args = parser.parse_args()
-
-    build(
-        chat_identifier=args.chat,
-        index_dir=args.index_dir,
-        batch_size=args.batch_size,
-    )
-
-
-if __name__ == "__main__":
-    main()
