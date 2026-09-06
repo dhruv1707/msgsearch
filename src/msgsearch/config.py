@@ -5,6 +5,7 @@ chat filter come from environment variables, or from a `config_local.py` that is
 listed in .gitignore and never committed.
 """
 
+import contextlib
 import os
 from pathlib import Path
 
@@ -18,6 +19,25 @@ DB_PATH = Path(os.environ.get("MSGSEARCH_DB", "~/msgsearch/chat.db")).expanduser
 INDEX_DIR = Path(os.environ.get("MSGSEARCH_INDEX", "~/msgsearch/index")).expanduser()
 
 # --- scope -------------------------------------------------------------------
+
+# macOS Contacts, for turning handles into names. Reading the system copy needs
+# the Contacts permission (which is separate from Full Disk Access), so this can
+# instead point at a copy made by an app that has it — exactly as DB_PATH points
+# at a copy of chat.db:
+#   cp ~/Library/Application\ Support/AddressBook/AddressBook-v22.abcddb ~/msgsearch/
+ADDRESSBOOK_PATH = Path(
+    os.environ.get(
+        "MSGSEARCH_ADDRESSBOOK",
+        "~/Library/Application Support/AddressBook/AddressBook-v22.abcddb",
+    )
+).expanduser()
+
+# Handle -> name mapping, so speakers appear by name rather than phone number.
+# Optional: without it, handles are used as-is. Kept outside the repo because it
+# is a list of everyone you have ever texted.
+CONTACTS_FILE = Path(
+    os.environ.get("MSGSEARCH_CONTACTS", "~/msgsearch/contacts.json")
+).expanduser()
 
 # Restrict indexing to a single conversation while developing. This is a phone
 # number or email address, so it must come from the environment and never be
@@ -83,7 +103,5 @@ DEFAULT_LIMIT = 10
 
 
 # Optional untracked overrides. Anything defined in config_local.py wins.
-try:
-    from config_local import *  # noqa: F401,F403
-except ImportError:
-    pass
+with contextlib.suppress(ImportError):
+    from config_local import *  # noqa: F403
