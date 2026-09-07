@@ -9,6 +9,12 @@ chat messages, which behave differently enough to change several decisions.
 Where measurement has contradicted an assumption, the measurement wins and the
 number is recorded here.
 
+[qmd](https://github.com/tobi/qmd) does this for markdown notes and documents and
+is worth reading. The retrieval shape is much the same; what differs is chunking,
+because a document is long and a message is not — see
+[Chunking](#chunking-messages-are-not-documents-and-windows-are-not-passages) for
+the measurements that forced the change.
+
 ## Pipeline
 
 ```

@@ -3,6 +3,14 @@
 Notable changes to msgsearch. Retrieval changes carry the measurement that
 justified them; see `ARCHITECTURE.md` for the full evaluation.
 
+## [0.2.10] — 2026-09-07
+
+### Added
+- An acknowledgement of [qmd](https://github.com/tobi/qmd), which does this for
+  markdown notes and documents. The earlier removal of those references went too
+  far: framing every decision as derived from it was wrong, but so is saying
+  nothing about the adjacent project people will reasonably compare this to.
+
 ## [0.2.9] — 2026-09-07
 
 ### Changed
