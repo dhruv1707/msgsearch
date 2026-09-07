@@ -32,7 +32,7 @@ INDEX = os.path.join(
 # whole point of TREC-style pooling.
 RETRIEVERS = ["eval.retriever_bm25", "eval.retriever_dense"]
 
-# qmd's taxonomy, adapted to messages. Purely for grouping -- it does not change
+# A taxonomy of query kinds, for grouping only -- it does not change
 # search behaviour, it tells you *which kind* of query a retriever fails on.
 TYPES = {
     "1": ("exact", "you remember the actual words (a name, number, phrase)"),

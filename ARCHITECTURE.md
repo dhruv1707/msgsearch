@@ -3,11 +3,11 @@
 Local-first semantic search over ~260k iMessages. No message text ever leaves the
 machine — not to an embedding API, not to a reranker, not in a commit.
 
-The design follows the pipeline Tobi Lütke's [qmd](https://github.com/tobi/qmd)
-converged on after ~3 months of eval-driven iteration, adapted from markdown
-documents to chat messages. Where qmd's choices are load-bearing, they are cited.
-Where measurement has since contradicted an assumption, the measurement wins and
-the number is recorded here.
+The pipeline is the conventional one for hybrid retrieval — keyword search and
+vector search fused, with an optional reranking stage — adapted from documents to
+chat messages, which behave differently enough to change several decisions.
+Where measurement has contradicted an assumption, the measurement wins and the
+number is recorded here.
 
 ## Pipeline
 
@@ -36,8 +36,8 @@ Two files in `~/msgsearch/index/`, outside the repo:
 | `index.db` | windows, passages, and the FTS5 lexical index |
 | `vectors.npy` | one unit-length row per passage, aligned to `passages.vector_row` |
 
-qmd keeps vectors inside SQLite via `sqlite-vec`, and that remains the right call
-at document scale. It is not yet worth it here. With ~95k passages a search is a
+Keeping vectors inside SQLite via `sqlite-vec` is the conventional choice and a
+reasonable one at larger scale. It is not yet worth it here. With ~95k passages a search is a
 single `numpy` matrix multiply over a 95k×768 array, which completes in single-digit
 milliseconds — faster than an ANN index once its own overhead is counted, and it
 avoids a dependency. Revisit if the full-corpus index (398 chats with indexable messages) makes the
@@ -52,10 +52,10 @@ array unwieldy, which is the point where ANN starts to earn its keep.
 
 ## Chunking: messages are not documents, and windows are not passages
 
-This is the main departure from qmd. qmd chunks documents into ~900-token windows
-with 15% overlap. iMessages are the opposite problem — the median message is under
-20 tokens, far too short to embed meaningfully in isolation ("yeah", "ok sounds
-good", "that one").
+This is where chat departs most sharply from documents. Document retrieval chunks
+prose into windows of several hundred tokens with some overlap. Messages are the
+opposite problem — the median message is under 20 tokens, far too short to embed
+meaningfully in isolation ("yeah", "ok sounds good", "that one").
 
 So messages are grouped into **conversation windows**: consecutive messages in one
 chat with no pause longer than 30 minutes. Measured on a 105k-message thread this
@@ -110,12 +110,12 @@ Each stage ships only when the eval says it beat the previous one.
    concentrated on topical queries (nDCG 0.790 → 0.521). It takes rankings fusion
    already got right and scrambles them. These rerankers are trained on clean QA
    passages, and a window of "Yaaa bro I do" is far outside that distribution.
-   - qmd blends reranker and retrieval scores by position — trusting retrieval
-     more at the top (75/25 for ranks 1–3) and the reranker more further down
-     (40/60 past rank 11) — which is designed to prevent exactly the failure
-     measured above. **Untested here.** It is the obvious thing to try before
-     concluding the stage is worthless; the current implementation lets the
-     reranker override outright, which is the version that lost.
+   - Blending reranker and retrieval scores by position — trusting retrieval more
+     at the top few ranks and the reranker more further down — is a known
+     technique for preventing exactly the failure measured above. **Untested
+     here.** It is the obvious thing to try before concluding the stage is
+     worthless; the current implementation lets the reranker override outright,
+     which is the version that lost.
 5. **Query expansion** — only if stages 1–4 plateau. Highest cost, least certain
    payoff.
 
@@ -126,7 +126,7 @@ Both run locally on Metal via MPS.
 | role | model | notes |
 |---|---|---|
 | embedding | `google/embeddinggemma-300m` | 768-dim. **Gated** — needs Gemma licence acceptance and `msgsearch login`. Matryoshka truncation to 512/256/128 available if the array grows. |
-| rerank | `Qwen/Qwen3-Reranker-0.6B` | matches qmd's choice |
+| rerank | `Qwen/Qwen3-Reranker-0.6B` | implemented, disabled by default |
 
 Rerankers measured over 50 candidates on the one query available:
 
