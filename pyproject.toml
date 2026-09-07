@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "msgsearch"
-version = "0.2.7"
+version = "0.2.8"
 description = "Search your iMessage history by meaning, entirely on your own machine."
 readme = "README.md"
 license = { file = "LICENSE" }

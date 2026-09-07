@@ -13,6 +13,6 @@ The pipeline, in the order data flows through it:
 Nothing here sends message text anywhere. Both models run locally.
 """
 
-__version__ = "0.2.7"
+__version__ = "0.2.8"
 
 __all__ = ["__version__"]

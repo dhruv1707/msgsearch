@@ -3,6 +3,16 @@
 Notable changes to msgsearch. Retrieval changes carry the measurement that
 justified them; see `ARCHITECTURE.md` for the full evaluation.
 
+## [0.2.8] — 2026-09-07
+
+### Fixed
+- The roadmap framed one-index-per-person as a limitation to be outgrown, and
+  pointed at a shared multi-tenant index as the eventual architecture. That is
+  backwards: per-user indexing is the design. Each person indexes with their own
+  credentials, so there is never another caller whose reads would need filtering,
+  and permission enforcement lives entirely at ingest. Records the real cost of
+  that choice, which is duplication rather than complexity.
+
 ## [0.2.7] — 2026-09-07
 
 ### Added

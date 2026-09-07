@@ -289,14 +289,29 @@ Three things follow, none of them built:
 - Scopes carry a **last-confirmed timestamp**, so stale entries can be excluded
   rather than silently trusted forever.
 
-**Multi-user is a different project.** Everything above assumes one person on
-their own machine, where "what the user can read" is fixed at ingest.
-[Lobu](https://github.com/lobu-ai/lobu) solves the harder version — many callers
-against one index, filtering every read to the resources that particular caller
-belongs to, with a gateway holding OAuth credentials so workers never see tokens.
-That is the correct architecture for a team deployment and a substantially larger
-undertaking than this. If msgsearch ever grows past one machine, the read-filter
-belongs at query time and per-caller, not at ingest.
+**One index per person, and that is the design rather than a stepping stone.**
+Each user runs msgsearch on their own machine and builds their own index with
+their own credentials. There is no shared corpus, so there is no such thing as
+another caller whose reads would need filtering. Permission enforcement happens
+entirely at ingest: your token decides what gets indexed, and the index is only
+ever queried by you.
+
+That collapses a whole class of problem. A shared index serving many people needs
+per-caller read filtering at query time, a gateway holding everyone's OAuth
+credentials, and an audit trail — which is what
+[Lobu](https://github.com/lobu-ai/lobu) builds, and the right architecture for a
+team deployment. None of it is needed here, and adopting it would mean giving up
+the local-first property that motivates the project.
+
+The price is duplication: ten colleagues indexing the same Slack workspace store
+and embed it ten times over. That is the correct trade for a tool whose first
+promise is that your messages stay on your machine, but it is a real cost and
+worth stating rather than discovering.
+
+What per-user indexing does **not** solve is revocation. Your own index still
+retains content from a channel you have since left, and it is still your index
+that would serve it. That problem is above, and it is unaffected by how many
+people are involved.
 
 ### The tension this creates, stated plainly
 
