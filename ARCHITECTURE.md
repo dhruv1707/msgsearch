@@ -190,6 +190,84 @@ Declared in `pyproject.toml`, pinned rather than ranged: a different embedding m
 a Rosetta process cannot use the GPU regardless. The system `python3` at
 `/usr/local` on this machine is an Intel build and cannot be used.
 
+## Roadmap: many sources, one search, exposed to agents
+
+None of this is built. It is written down because it shapes decisions being made
+now, and because the architecture already accommodates most of it.
+
+### Why the pipeline is nearly source-agnostic already
+
+Only `extract.py` knows what iMessage is. Windowing, passages, tagging, indexing
+and search all operate on the `Message` dataclass and would not change. A
+connector's entire job is producing those fields:
+
+    rowid  guid  chat_id  chat_label  chat_is_group  timestamp
+    is_from_me  speaker  service  text  reply_to  attachments
+
+Two things need adjusting before a second source can exist:
+
+- **`window_id` must be namespaced.** It is `chat_id:first_rowid` today, which
+  would collide across sources. `slack:C01234:5678` or similar.
+- **The index needs a `source` column**, so results can be filtered and attributed.
+
+Neither is large. The `service` field already carries `iMessage` / `SMS` and
+would extend naturally.
+
+### Connector feasibility, honestly
+
+| source | how | difficulty |
+|---|---|---|
+| **Telegram** | MTProto user client, or the Desktop JSON export | easy — a real API for your own history |
+| **Slack** | Web API (`conversations.history`) via OAuth, or a workspace export | easy — but free workspaces only retain a window, and corporate ones may need admin approval |
+| **Discord** | a bot reading channels it has joined | feasible for servers; **not** personal DMs, since automating a user account violates the ToS |
+| **WhatsApp** | per-chat "Export chat", manually | **hard, and not promised.** End-to-end encryption means no API for personal history. `msgstore.db` needs root, iOS backups are encrypted, and libraries automating WhatsApp Web violate the ToS and get numbers banned. The manual export drops metadata and is capped. |
+
+WhatsApp is listed to record that it was investigated, not to imply it is coming.
+
+### An MCP server
+
+The point of unifying sources is not tidiness, it is that **an agent working in
+your repository has no access to the conversations where the decisions were
+made**. The reasoning behind a design lives in a Slack thread; the client's
+actual requirement lives in a DM. Neither is in the code, the commits or the
+tickets.
+
+Exposing msgsearch over the [Model Context Protocol](https://modelcontextprotocol.io)
+would let any MCP-capable agent query that context directly. Retrieval is already
+a clean function, so the server is a thin layer over it. Sketch:
+
+    search_messages(query, limit=10, source=?, from=?, after=?, before=?, type=?)
+        -> ranked windows: id, source, participants, timestamps, matched text
+
+    get_conversation(window_id, context=0)
+        -> the full window, optionally with neighbouring ones
+
+    list_sources()
+        -> which connectors are indexed, and how current each is
+
+The Python SDK is mature (`mcp`, `fastmcp`), and both require Python 3.10+,
+matching this project.
+
+### The tension this creates, stated plainly
+
+This project's first promise is that nothing leaves your machine. An MCP server
+consumed by a **cloud-hosted** agent breaks that promise: message content —
+including the credentials this tool is unusually good at surfacing — would be
+sent to a model provider.
+
+That is a legitimate trade, but it must be a deliberate one, so the server would:
+
+- be **opt-in**, never running by default;
+- **warn loudly** on startup about what it exposes;
+- support a **metadata-only mode**, returning ids, participants and timestamps
+  but not message text, so an agent can find *where* something was discussed and
+  hand the reader a pointer rather than the content;
+- honour the existing `--type` filters, so credential-bearing windows can be
+  excluded from what an agent can ever see.
+
+An agent running against a local model has no such exposure. The design should
+make the difference legible rather than assume either case.
+
 ## Evaluation
 
 `eval/gold.jsonl` is the contract. Queries are labeled by pooling retriever

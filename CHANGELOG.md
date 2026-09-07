@@ -3,6 +3,19 @@
 Notable changes to msgsearch. Retrieval changes carry the measurement that
 justified them; see `ARCHITECTURE.md` for the full evaluation.
 
+## [0.2.6] — 2026-09-07
+
+### Changed
+- The architecture document described itself as an adaptation of another project,
+  citing it for choices that are simply the conventional ones for hybrid
+  retrieval. Reframed on its own terms; technical content unchanged.
+
+### Added
+- A roadmap: connectors for other chat sources, and an MCP server so coding
+  agents can search conversations as a tool. Includes an honest per-platform
+  feasibility table (WhatsApp is hard and not promised) and states the privacy
+  tension an MCP server creates rather than glossing it.
+
 ## [0.2.5] — 2026-09-06
 
 Documentation only; released because PyPI freezes a project's description.

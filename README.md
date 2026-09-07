@@ -194,6 +194,26 @@ msgsearch contacts    map phone numbers and emails to names
 msgsearch explore     structural report on a database (prints no message content)
 ```
 
+## Where this is going
+
+Today msgsearch reads iMessage. The pipeline is nearly source-agnostic already —
+only the extraction step knows what iMessage is — so the plan is **one search
+across every conversation you have**: Telegram and Slack next, Discord for
+servers a bot can join. WhatsApp was investigated and is genuinely hard; it is
+not promised.
+
+The reason for unifying them is the second half: exposing msgsearch over the
+[Model Context Protocol](https://modelcontextprotocol.io), so any MCP-capable
+coding agent can search your conversations as a tool. An agent working in your
+repository has no access to the thread where a design was argued out, or the DM
+where a client stated what they actually wanted. None of that is in the code.
+
+That cuts against this project's first promise, and deliberately so: an agent
+running on someone else's servers would receive message content. So the server
+will be opt-in, will warn about what it exposes, and will support a
+metadata-only mode that returns *where* something was discussed without the text.
+See [ARCHITECTURE.md](ARCHITECTURE.md#roadmap-many-sources-one-search-exposed-to-agents).
+
 ## How it works, and why
 
 **86% of your messages have no text.** Apple sets `message.text` to NULL on most
