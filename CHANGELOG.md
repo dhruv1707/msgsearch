@@ -3,6 +3,25 @@
 Notable changes to msgsearch. Retrieval changes carry the measurement that
 justified them; see `ARCHITECTURE.md` for the full evaluation.
 
+## [0.2.5] — 2026-09-06
+
+Documentation only; released because PyPI freezes a project's description.
+
+### Changed
+- Restructured the README. It had been patched repeatedly and the order no longer
+  made sense: the quickstart told you to install before the requirements told you
+  whether your machine could run it, and the same install command appeared three
+  times in three sections. Permission instructions sat as a subsection inside the
+  quickstart, interrupting it.
+- Reading order is now problem, example output, requirements, install, setup,
+  use — so a reader can decide whether they want the tool before being asked to
+  install anything.
+
+### Added
+- An example of actual search output near the top. For a search tool that is the
+  fastest way to convey what it does, and it was missing entirely.
+- A single table of every command.
+
 ## [0.2.4] — 2026-09-06
 
 Documentation only; released because PyPI freezes a project's description at

@@ -5,84 +5,46 @@ Search your iMessage history by meaning, entirely on your own machine.
 Apple's Messages search matches literal words. That fails whenever you remember
 *what happened* but not *what was said* — someone sent you a login months ago and
 the message containing it never uses the word "login", so no amount of typing
-finds it. This tool retrieves by meaning as well as by keyword, and it never sends
-your messages anywhere.
+finds it.
 
-## ⚠️ Read this before you build an index
+```console
+$ msgsearch search "the wifi password at the airbnb"
 
-The index is a **plaintext, searchable copy of every private thing anyone has ever
-texted you**, including passwords, addresses and medical details. It is written to
-`~/msgsearch/index/` by default, outside this repository, and `.gitignore` is set
-up to make committing it difficult. Treat that directory the way you would treat a
-password manager's database. Both models run locally, so nothing is uploaded, but
-what lands on your disk is unencrypted.
-
-## Quickstart
-
-```bash
-# 1. install  (needs an arm64 Python — see Install if this errors)
-pipx install msgsearch
-
-# 2. get the embedding model  (accept the licence in a browser first, then:)
-msgsearch login
-
-# 3. snapshot your messages            [needs Full Disk Access]
-msgsearch sync
-
-# 4. check the setup, and fix whatever it names
-msgsearch doctor
-
-# 5. build the index                   [~30 min per 100k messages, once]
-msgsearch index
-
-# 6. search
-msgsearch search "that restaurant we talked about"
+1. 2025-06-14 19:02-19:20  Sam Rivera  (Me, Sam Rivera)  [credential]
+   bm25 #2 · vector #1
+  Sam Rivera: just got here, place is nice
+  Me: what's the wifi
+  Sam Rivera: network is Coastal_5G, password Harbour2019Blue
 ```
 
-Afterwards, one command keeps it current — only genuinely new text is embedded,
-so it takes seconds:
+Nothing leaves your machine: both the embedding and reranking models run locally.
 
-```bash
-msgsearch sync --index
-```
-
-### Granting Full Disk Access
-
-Step 3 fails without it. macOS grants this to the **application**, not to your
-shell, so the grant goes to whatever program you type commands into.
-
-1. Open **System Settings → Privacy & Security → Full Disk Access**
-2. Click **+**
-3. Press **⌘⇧G** and paste `/Applications/Utilities/Terminal.app`, then Open
-   (if you use iTerm, VS Code or another terminal, choose that instead)
-4. Make sure its toggle is **on**
-5. **Quit and reopen that application** — the permission is only read at launch
-
-Resolving contact names needs a *separate* permission, **Contacts**, granted the
-same way in the same place. It is optional; without it speakers appear as phone
-numbers. Full Disk Access does not include it.
+> [!WARNING]
+> The index it builds is a **plaintext, searchable copy of every private thing
+> anyone has ever texted you** — passwords, addresses, medical details. It lives
+> in `~/msgsearch/index/`, unencrypted. Treat that directory the way you would
+> treat a password manager's database.
 
 ## Requirements
 
 - **macOS on Apple silicon.** PyTorch no longer publishes x86_64 macOS wheels.
-- **Python 3.10 or newer, running as arm64.** See the note below — this is the
-  one thing that reliably goes wrong.
-- About 3 GB of disk for dependencies and model weights.
+- **Python 3.10 or newer, running as arm64.** This is the one thing that
+  reliably goes wrong — see [Install](#install) if it does.
+- **About 3 GB of disk** for dependencies and model weights.
 
 ## Install
 
 ```bash
 pipx install msgsearch
-msgsearch doctor
+msgsearch doctor          # verifies your machine, names any problem and its fix
 ```
 
-This pulls PyTorch, around 1 GB, so the first install is slow. Everything after
-that is local and fast.
+The install pulls PyTorch, around 1 GB, so it is slow once and fast thereafter.
 
 <details>
-<summary><b>If that fails with "No matching distribution found for torch"</b></summary>
+<summary><b>If it fails with "No matching distribution found for torch"</b></summary>
 
-You have an Intel-built Python, which is common on Apple silicon after migrating
+Your Python is an Intel build, which is common on Apple silicon after migrating
 from an Intel Mac. Check:
 
 ```bash
@@ -91,11 +53,11 @@ python3 -c "import platform; print(platform.machine())"   # must say arm64
 
 The confusing part is that `pipx install --python /path/to/arm64/python` often
 **does not fix it**. Python from python.org is a *universal* binary that runs as
-whichever architecture its parent process is, and if pipx itself was installed by
-an Intel Homebrew (`/usr/local/...`), it launches that Python as x86_64. pip then
-looks for x86_64 wheels that PyTorch does not publish.
+whichever architecture its parent process is, so a pipx installed by an Intel
+Homebrew launches it as x86_64 whichever interpreter you name. pip then hunts for
+x86_64 wheels PyTorch does not publish.
 
-Install into a venv created explicitly under arm64 instead:
+Create the environment explicitly under `arch -arm64` instead:
 
 ```bash
 arch -arm64 /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 \
@@ -104,171 +66,133 @@ arch -arm64 /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 \
 ln -sf ~/.msgsearch-venv/bin/msgsearch /usr/local/bin/msgsearch
 ```
 
-Adjust the interpreter path to any arm64 Python 3.10+. To undo:
+Substitute any arm64 Python 3.10+. To undo:
 `rm /usr/local/bin/msgsearch && rm -rf ~/.msgsearch-venv`.
 
-Architecture cannot be expressed in package metadata, which is why this surfaces
-as a dependency-resolution wall rather than a useful error. `msgsearch doctor`
-reports it in one line.
+Architecture cannot be expressed in package metadata, which is why this appears
+as a wall of dependency errors rather than a useful message.
 </details>
-
-To work on msgsearch rather than use it:
-
-```bash
-git clone https://github.com/dhruv1707/msgsearch && cd msgsearch
-arch -arm64 python3 -m venv .venv          # must be an arm64 interpreter
-./.venv/bin/python -m pip install -e ".[dev]"
-```
 
 ## Setup
 
-### 1. Model access
+Three one-time steps. `msgsearch doctor` will tell you which of them you still
+need at any point.
 
-The default embedding model, `google/embeddinggemma-300m`, is gated: Google
-requires you to accept its licence before downloading. This is a one-time thing.
+### 1. Get access to the embedding model
 
-1. **Create a HuggingFace account** if you do not have one — <https://huggingface.co/join>. Free.
-2. **Accept the licence.** Open <https://huggingface.co/google/embeddinggemma-300m>,
-   sign in, and click the button acknowledging the Gemma terms at the top of the
-   page. Approval is normally immediate.
-3. **Create a token.** Go to <https://huggingface.co/settings/tokens>, click
-   *Create new token*, give it the **Read** role, and copy it. It looks like
-   `hf_...`.
-4. **Log in:**
+`google/embeddinggemma-300m` is gated — Google requires you to accept its licence.
 
-   ```bash
-   msgsearch login
-   ```
+1. Create a free account at <https://huggingface.co/join>
+2. Open <https://huggingface.co/google/embeddinggemma-300m>, sign in, and accept
+   the Gemma terms at the top of the page. Approval is normally immediate.
+3. Create a token at <https://huggingface.co/settings/tokens> with the **Read**
+   role, and copy it
+4. Run `msgsearch login` and paste it when prompted
 
-   Paste the token when prompted. It is stored in `~/.cache/huggingface`, not by
-   msgsearch. You can also pass it directly with `msgsearch login --token hf_...`.
+The model itself (1.2 GB) downloads automatically the first time you index.
+There is no separate download step.
 
-`msgsearch login` checks afterwards that the model is genuinely reachable, rather
-than only that the token is valid. Those are different conditions — you can be
-perfectly logged in and still be refused because step 2 was skipped — and
-HuggingFace reports both as the same 401 saying "please log in", which sends
-people back to re-do the step they already did.
+Being logged in and having accepted the licence are different things, and
+HuggingFace reports both failures as the same "please log in" error — so
+`msgsearch login` checks afterwards that the model is genuinely reachable.
 
-The model itself downloads automatically the first time you index, about 1.2 GB,
-cached in `~/.cache/huggingface`. There is no separate download step.
-
-**Don't want a HuggingFace account?** Use an ungated model instead. Retrieval is
-somewhat weaker, but nothing else changes:
+Prefer not to make an account? Use an ungated model. Retrieval is somewhat
+weaker; nothing else changes:
 
 ```bash
 export MSGSEARCH_EMBED_MODEL=BAAI/bge-small-en-v1.5
 ```
 
-### 2. Snapshot your messages
+### 2. Grant Full Disk Access
 
-**Never point this tool at `~/Library/Messages`** — that file is live, Messages
-holds locks on it, and it is irreplaceable.
+Reading your messages needs it. macOS grants this to the **application**, not to
+your shell, so it goes to whatever program you type commands into.
 
-```bash
-msgsearch sync
-```
+1. Open **System Settings → Privacy & Security → Full Disk Access**
+2. Click **+**
+3. Press **⌘⇧G**, paste `/Applications/Utilities/Terminal.app`, then Open
+   (choose iTerm, VS Code or whatever you actually use, if not Terminal)
+4. Make sure its toggle is **on**
+5. **Quit and reopen that application** — the permission is only read at launch
 
-This needs Full Disk Access (see above for how to grant it). It uses SQLite's
-backup API rather than `cp`, which matters more than it sounds: Messages runs in
-WAL mode, so your most recent messages live in a `chat.db-wal` sidecar until they
-are checkpointed. `cp chat.db` alone drops exactly the messages you are most
-likely to search for, silently. The snapshot folds the write-ahead log in and
-leaves a single self-contained file.
-
-### 3. Names (optional)
-
-Without names, speakers appear as phone numbers. Resolving them makes results
-readable *and* improves retrieval, because the speaker label is part of the text
-that gets embedded — `Sam: ...` carries meaning where `+15551234567: ...` does not.
-
-The simplest route is to grant Contacts access to whatever runs msgsearch
-(System Settings → Privacy & Security → Contacts — that is your terminal, or your
-editor if you run it from one). Names are then read automatically and stay
-current; nothing else is needed.
-
-Contacts is a separate permission from Full Disk Access, and macOS grants it to
-the *app*, not the shell — so if you run msgsearch from an editor's integrated
-terminal, the grant has to go to the editor. To sidestep that entirely, copy the
-database from an app that does hold the permission and point at the copy, exactly
-as you did for `chat.db`:
+### 3. Snapshot your messages and build the index
 
 ```bash
-cp ~/Library/Application\ Support/AddressBook/AddressBook-v22.abcddb ~/msgsearch/
-export MSGSEARCH_ADDRESSBOOK=~/msgsearch/AddressBook-v22.abcddb
+msgsearch sync            # copy the live database  (safe: never writes to it)
+msgsearch index           # ~30 minutes per 100k messages, once
 ```
 
-If you would rather not do either, or want to correct a name or label someone who
-is not in your address book, use the alias file instead:
-
-```bash
-./.venv/bin/msgsearch contacts                 # what is resolved, and from where
-./.venv/bin/msgsearch contacts --template 20   # stub for the 20 busiest handles
-$EDITOR ~/msgsearch/contacts.json              # fill in names; blanks are ignored
-./.venv/bin/msgsearch contacts --import out.vcf  # or import a vCard export
-```
-
-The alias file overrides Contacts entry by entry, so a nickname you prefer wins.
-A handful of names goes a long way: on a typical archive the ten busiest handles
-account for over 90% of received messages.
-
-Do this *before* building the index. Changing a speaker's name changes the text
-that was embedded, so it costs a full re-index afterwards.
+`sync` uses SQLite's backup API rather than `cp`. That matters: Messages runs in
+WAL mode, so your most recent messages sit in a `chat.db-wal` sidecar until they
+are checkpointed, and `cp chat.db` drops exactly the messages you are most likely
+to search for, silently.
 
 ## Use
 
 ```bash
-./.venv/bin/msgsearch doctor                  # is this machine set up correctly?
-./.venv/bin/msgsearch explore                 # what is in your database
-./.venv/bin/msgsearch index                   # build the index
-./.venv/bin/msgsearch search "atria login"    # search it
+msgsearch search "that restaurant we talked about"
 ```
 
-If anything goes wrong, run `msgsearch doctor` first: it checks the interpreter
-architecture, PyTorch, the database, model access and the index, and prints the
-command that fixes whatever is broken.
+Useful flags:
 
-Indexing everything takes a while — roughly half an hour per 100k messages on an
-M-series Mac — so restrict it to one conversation while trying things out:
-
-```bash
-./.venv/bin/msgsearch index --chat '+15551234567'
+```
+--limit N            how many results (default 10)
+--chat TEXT          restrict to conversations matching TEXT
+--from WHO           restrict to a speaker
+--after / --before   YYYY-MM-DD
+--type credential    only windows that appear to CONTAIN a credential
+                     (also: credential_talk, email, phone, url, address)
+--full               show the whole conversation, not just the matching part
+--no-dense           keyword search only
+--no-bm25            vector search only
+--rerank             run the cross-encoder (off by default; it measurably hurts)
 ```
 
-When new messages arrive, refresh and re-index:
+`--type credential` is the one worth remembering. Searching for a forgotten
+password without it returns mostly people *discussing* passwords; with it, the
+message containing one tends to come first.
+
+### Keeping it current
+
+Your snapshot is frozen at the moment you took it, so new messages need both a
+refresh and a re-index. That is one command, and it takes seconds rather than the
+original half hour, because only genuinely new text is embedded:
 
 ```bash
 msgsearch sync --index
 ```
 
-Re-running `msgsearch index` later is cheap. Embeddings are cached by passage
-content, so an ordinary top-up only embeds text that is genuinely new — a rebuild
-with nothing new to do takes seconds rather than half an hour. Use `--rebuild` to
-force everything to be recomputed.
+### Names (optional)
 
-Useful search flags:
+Without this, speakers appear as phone numbers. Resolving them makes results
+readable *and* improves retrieval, because the speaker label is part of the text
+that gets embedded — `Sam: ...` carries meaning where `+15551234567: ...` does not.
 
-```
---limit N        how many results
---chat TEXT      restrict to conversations matching TEXT
---from WHO       restrict to a speaker
---after / --before YYYY-MM-DD
---type credential    only windows that appear to CONTAIN a credential
-                     (credential_talk is the separate tag for windows that only
-                     discuss one; also: email, phone, url, address)
---full           show the whole conversation window, not just the match
---rerank         run the cross-encoder (off by default; see below)
---no-dense       keyword search only
---no-bm25        vector search only
+Grant **Contacts** access the same way you granted Full Disk Access (it is a
+separate permission; one does not imply the other) and names are picked up
+automatically. Otherwise, or to correct a name:
+
+```bash
+msgsearch contacts                 # what is resolved, and from where
+msgsearch contacts --template 20   # a stub for the 20 busiest handles
+$EDITOR ~/msgsearch/contacts.json  # fill in names; blanks are ignored
 ```
 
-`--type credential` is the flag worth knowing about. Searching for a forgotten
-password without it returns mostly people *discussing* the password; with it, the
-message containing one tends to come first.
+A handful goes a long way: on a typical archive the ten busiest handles account
+for over 90% of received messages. Do this *before* indexing — changing a name
+changes the embedded text, so it costs a full rebuild afterwards.
 
-Reranking is **off by default** because it was measured and it hurts: over the
-gold set it drops MRR from 0.84 to 0.70, and on broad topical queries it takes
-rankings that fusion got right and scrambles them. `--rerank` turns it back on if
-you want to see for yourself.
+## All commands
+
+```
+msgsearch doctor      check this machine is set up correctly, and name any fix
+msgsearch login       authenticate with HuggingFace for the embedding model
+msgsearch sync        refresh the working copy of the messages database
+msgsearch index       build the search index
+msgsearch search      search it
+msgsearch contacts    map phone numbers and emails to names
+msgsearch explore     structural report on a database (prints no message content)
+```
 
 ## How it works, and why
 
