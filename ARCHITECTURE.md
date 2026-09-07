@@ -220,6 +220,7 @@ would extend naturally.
 | **Telegram** | MTProto user client, or the Desktop JSON export | easy — a real API for your own history |
 | **Slack** | Web API (`conversations.history`) via OAuth, or a workspace export | easy — but free workspaces only retain a window, and corporate ones may need admin approval |
 | **Discord** | a bot reading channels it has joined | feasible for servers; **not** personal DMs, since automating a user account violates the ToS |
+| **GitHub** | REST API for issue and PR comments | easy — token-scoped, and the discussion around a change is often the context an agent most needs |
 | **WhatsApp** | per-chat "Export chat", manually | **hard, and not promised.** End-to-end encryption means no API for personal history. `msgstore.db` needs root, iOS backups are encrypted, and libraries automating WhatsApp Web violate the ToS and get numbers banned. The manual export drops metadata and is capped. |
 
 WhatsApp is listed to record that it was investigated, not to imply it is coming.
@@ -247,6 +248,55 @@ a clean function, so the server is a thin layer over it. Sketch:
 
 The Python SDK is mature (`mcp`, `fastmcp`), and both require Python 3.10+,
 matching this project.
+
+### Permissions: index only what the user can already read
+
+Every source after iMessage brings access control with it. A Slack workspace has
+private channels, GitHub has private repositories, Discord has servers you were
+never in. Indexing content the user cannot see would turn a search tool into a
+privilege-escalation device, and doing it accidentally is easy.
+
+The rule is that **msgsearch never sees more than the person running it**. That
+falls out almost for free if connectors authenticate *as the user* rather than as
+a bot or an admin: the source enforces its own ACLs at the API boundary, and the
+connector inherits them without having to model them.
+
+| source | scoped by | what it can reach |
+|---|---|---|
+| iMessage | the local account | conversations on this Mac |
+| Slack | user OAuth token | channels the user is in, plus their DMs — not private channels they are not a member of |
+| GitHub | a `repo`-scoped PAT or OAuth app | issue and PR comments in repositories the user can read |
+| Telegram | the user's own session | their own chats |
+| Discord | a bot token | only channels the bot has been invited to |
+
+Discord is the odd one: a bot's reach is not the user's reach, so a Discord
+connector would index what the *bot* can see. That difference has to be shown in
+the interface rather than hidden.
+
+**The hard part is not granting access, it is losing it.** An index is a cache of
+permission decisions made in the past. Leave a Slack channel, lose access to a
+repository, get removed from a workspace — the content stays in the local index
+and would be served happily to whatever asks. Nothing in the current design would
+notice.
+
+Three things follow, none of them built:
+
+- Every window records the **source scope it came from** (workspace, channel id,
+  repository, visibility), so it can be re-checked rather than merely trusted.
+- A **revalidation pass** on refresh confirms the user still has access to each
+  scope, and prunes windows whose access has gone. Re-indexing already re-reads
+  everything, so this is the natural place for it.
+- Scopes carry a **last-confirmed timestamp**, so stale entries can be excluded
+  rather than silently trusted forever.
+
+**Multi-user is a different project.** Everything above assumes one person on
+their own machine, where "what the user can read" is fixed at ingest.
+[Lobu](https://github.com/lobu-ai/lobu) solves the harder version — many callers
+against one index, filtering every read to the resources that particular caller
+belongs to, with a gateway holding OAuth credentials so workers never see tokens.
+That is the correct architecture for a team deployment and a substantially larger
+undertaking than this. If msgsearch ever grows past one machine, the read-filter
+belongs at query time and per-caller, not at ingest.
 
 ### The tension this creates, stated plainly
 

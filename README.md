@@ -198,9 +198,13 @@ msgsearch explore     structural report on a database (prints no message content
 
 Today msgsearch reads iMessage. The pipeline is nearly source-agnostic already —
 only the extraction step knows what iMessage is — so the plan is **one search
-across every conversation you have**: Telegram and Slack next, Discord for
-servers a bot can join. WhatsApp was investigated and is genuinely hard; it is
-not promised.
+across every conversation you have**: Telegram and Slack next, GitHub issue and
+PR comments, Discord for servers a bot can join. WhatsApp was investigated and is
+genuinely hard; it is not promised.
+
+Every connector authenticates *as you*, so msgsearch can never index more than
+you can already read — and access you lose later has to be pruned, since an index
+is a cache of permission decisions made in the past.
 
 The reason for unifying them is the second half: exposing msgsearch over the
 [Model Context Protocol](https://modelcontextprotocol.io), so any MCP-capable

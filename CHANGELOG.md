@@ -3,6 +3,15 @@
 Notable changes to msgsearch. Retrieval changes carry the measurement that
 justified them; see `ARCHITECTURE.md` for the full evaluation.
 
+## [0.2.7] — 2026-09-07
+
+### Added
+- A permissions model in the roadmap. Connectors authenticate as the user, so
+  the source enforces its own access control and msgsearch can never index more
+  than the person running it can read. Records the harder half too: an index is a
+  cache of past permission decisions, so access lost after indexing has to be
+  revalidated and pruned. GitHub issue and PR comments added as a source.
+
 ## [0.2.6] — 2026-09-07
 
 ### Changed
