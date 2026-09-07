@@ -198,9 +198,9 @@ msgsearch explore     structural report on a database (prints no message content
 
 Today msgsearch reads iMessage. The pipeline is nearly source-agnostic already —
 only the extraction step knows what iMessage is — so the plan is **one search
-across every conversation you have**: Telegram and Slack next, GitHub issue and
-PR comments, Discord for servers a bot can join. WhatsApp was investigated and is
-genuinely hard; it is not promised.
+across every conversation you have**: Slack next, then Telegram, and Discord for
+servers a bot can join. Sources an agent can already reach on its own — GitHub,
+for instance — are deliberately out of scope.
 
 Every connector authenticates *as you*, so msgsearch can never index more than
 you can already read — and access you lose later has to be pruned, since an index

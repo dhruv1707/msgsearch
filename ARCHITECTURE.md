@@ -220,8 +220,14 @@ would extend naturally.
 | **Telegram** | MTProto user client, or the Desktop JSON export | easy — a real API for your own history |
 | **Slack** | Web API (`conversations.history`) via OAuth, or a workspace export | easy — but free workspaces only retain a window, and corporate ones may need admin approval |
 | **Discord** | a bot reading channels it has joined | feasible for servers; **not** personal DMs, since automating a user account violates the ToS |
-| **GitHub** | REST API for issue and PR comments | easy — token-scoped, and the discussion around a change is often the context an agent most needs |
 | **WhatsApp** | per-chat "Export chat", manually | **hard, and not promised.** End-to-end encryption means no API for personal history. `msgstore.db` needs root, iOS backups are encrypted, and libraries automating WhatsApp Web violate the ToS and get numbers banned. The manual export drops metadata and is capped. |
+
+**GitHub is deliberately absent.** Issue and PR comments would be easy to ingest,
+but coding agents already reach GitHub — Claude Code has the `gh` CLI and an
+official GitHub MCP server exists — so indexing them would duplicate a capability
+the agent has anyway. This sets the scope rule for everything that follows:
+**msgsearch covers the conversations an agent cannot otherwise reach.** Anything
+already reachable is out.
 
 WhatsApp is listed to record that it was investigated, not to imply it is coming.
 
@@ -252,7 +258,7 @@ matching this project.
 ### Permissions: index only what the user can already read
 
 Every source after iMessage brings access control with it. A Slack workspace has
-private channels, GitHub has private repositories, Discord has servers you were
+private channels, Telegram has chats you are not in, Discord has servers you were
 never in. Indexing content the user cannot see would turn a search tool into a
 privilege-escalation device, and doing it accidentally is easy.
 
@@ -265,7 +271,6 @@ connector inherits them without having to model them.
 |---|---|---|
 | iMessage | the local account | conversations on this Mac |
 | Slack | user OAuth token | channels the user is in, plus their DMs — not private channels they are not a member of |
-| GitHub | a `repo`-scoped PAT or OAuth app | issue and PR comments in repositories the user can read |
 | Telegram | the user's own session | their own chats |
 | Discord | a bot token | only channels the bot has been invited to |
 

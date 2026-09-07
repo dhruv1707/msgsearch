@@ -3,6 +3,15 @@
 Notable changes to msgsearch. Retrieval changes carry the measurement that
 justified them; see `ARCHITECTURE.md` for the full evaluation.
 
+## [0.2.9] — 2026-09-07
+
+### Changed
+- Removed GitHub from the planned sources. Coding agents already reach GitHub —
+  Claude Code has the `gh` CLI and an official GitHub MCP server exists — so
+  indexing issue and PR comments would duplicate a capability the agent has
+  anyway. Records the scope rule this sets: msgsearch covers the conversations an
+  agent cannot otherwise reach, and anything already reachable is out.
+
 ## [0.2.8] — 2026-09-07
 
 ### Fixed
